@@ -1,21 +1,21 @@
-const mongoose = require('mongoose');
-const slugify = require('slugify');
+const mongoose = require("mongoose");
+const slugify = require("slugify");
 
 const projectSchema = new mongoose.Schema(
   {
     projectName: {
       type: String,
-      required: [true, 'Please provide project name'],
+      required: [true, "Please provide project name"],
       trim: true,
     },
     company: {
       type: String,
-      required: [true, 'Please provide company name'],
+      required: [true, "Please provide company name"],
       trim: true,
     },
     description: {
       type: String,
-      required: [true, 'Please provide project description'],
+      required: [true, "Please provide project description"],
     },
     address: {
       plot: {
@@ -32,21 +32,21 @@ const projectSchema = new mongoose.Schema(
       },
       area: {
         type: String,
-        required: [true, 'Please provide area'],
+        required: [false, "Please provide area"],
         trim: true,
       },
       city: {
         type: String,
-        required: [true, 'Please provide city'],
-        default: 'Dhaka',
+        required: [true, "Please provide city"],
+        default: "Dhaka",
         trim: true,
       },
     },
     location: {
       type: {
         type: String,
-        enum: ['Point'],
-        default: 'Point',
+        enum: ["Point"],
+        default: "Point",
       },
       coordinates: {
         type: [Number],
@@ -55,17 +55,23 @@ const projectSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ['Ongoing', 'Finished'],
-      required: [true, 'Please provide project status'],
+      enum: ["Ongoing", "Finished"],
+      required: [true, "Please provide project status"],
     },
     startDate: {
       type: Date,
-      required: [true, 'Please provide start date'],
+      required: [true, "Please provide start date"],
     },
     finishDate: {
       type: Date,
       default: null,
+      validate: {
+        validator: function (value) {
+          return value === null || value instanceof Date;
+        },
+      },
     },
+
     images: [
       {
         url: {
@@ -77,7 +83,7 @@ const projectSchema = new mongoose.Schema(
         },
         caption: {
           type: String,
-          default: '',
+          default: "",
         },
         isPrimary: {
           type: Boolean,
@@ -114,43 +120,47 @@ const projectSchema = new mongoose.Schema(
   },
   {
     timestamps: true,
-  }
+  },
 );
 
 // Create 2dsphere index for geospatial queries
-projectSchema.index({ location: '2dsphere' });
+projectSchema.index({ location: "2dsphere" });
 
 // Create text index for search
-projectSchema.index({ projectName: 'text', description: 'text', company: 'text' });
+projectSchema.index({
+  projectName: "text",
+  description: "text",
+  company: "text",
+});
 
 // Generate slug before saving
-projectSchema.pre('save', function (next) {
-  if (!this.isModified('projectName') && !this.isModified('company')) {
+projectSchema.pre("save", function (next) {
+  if (!this.isModified("projectName") && !this.isModified("company")) {
     return next();
   }
-  
+
   const slugText = `${this.projectName} ${this.company}`;
   this.slug = slugify(slugText, { lower: true, strict: true });
   next();
 });
 
 // Virtual for full address
-projectSchema.virtual('fullAddress').get(function () {
+projectSchema.virtual("fullAddress").get(function () {
   const parts = [];
-  
+
   if (this.address.plot) parts.push(`Plot ${this.address.plot}`);
   if (this.address.road) parts.push(`Road ${this.address.road}`);
   if (this.address.block) parts.push(`Block ${this.address.block}`);
   if (this.address.area) parts.push(this.address.area);
   if (this.address.city) parts.push(this.address.city);
-  
-  return parts.join(', ');
+
+  return parts.join(", ");
 });
 
 // Ensure virtuals are included in JSON
-projectSchema.set('toJSON', { virtuals: true });
-projectSchema.set('toObject', { virtuals: true });
+projectSchema.set("toJSON", { virtuals: true });
+projectSchema.set("toObject", { virtuals: true });
 
-const Project = mongoose.model('Project', projectSchema);
+const Project = mongoose.model("Project", projectSchema);
 
 module.exports = Project;

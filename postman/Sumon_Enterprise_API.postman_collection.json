@@ -1,0 +1,1611 @@
+{
+  "info": {
+    "name": "M/S Sumon Enterprise - Complete API",
+    "description": "Complete Postman collection for M/S Sumon Enterprise Backend API.\n\nBASE URL: http://localhost:5002\n\n## SETUP INSTRUCTIONS\n1. Import this collection into Postman\n2. Set the `baseUrl` variable to your server URL (default: http://localhost:5002)\n3. Run **Auth > Register Admin** first to create an admin account\n4. Run **Auth > Login** — the token will auto-save to `authToken` variable\n5. All protected routes use `{{authToken}}` automatically\n\n## COLLECTION VARIABLES\n- `baseUrl` — your server base URL\n- `authToken` — auto-set after login\n- `projectId` — auto-set after creating a project\n- `inquiryId` — auto-set after creating an inquiry\n- `projectSlug` — auto-set after creating a project",
+    "_postman_id": "sumon-enterprise-api-v1",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:5002",
+      "type": "string",
+      "description": "Base URL of your backend server"
+    },
+    {
+      "key": "authToken",
+      "value": "",
+      "type": "string",
+      "description": "JWT token — auto-filled after login"
+    },
+    {
+      "key": "projectId",
+      "value": "",
+      "type": "string",
+      "description": "Project ID — auto-filled after creating a project"
+    },
+    {
+      "key": "projectSlug",
+      "value": "",
+      "type": "string",
+      "description": "Project slug — auto-filled after creating a project"
+    },
+    {
+      "key": "inquiryId",
+      "value": "",
+      "type": "string",
+      "description": "Inquiry ID — auto-filled after creating an inquiry"
+    }
+  ],
+  "item": [
+    {
+      "name": "🏥 Health Check",
+      "item": [
+        {
+          "name": "Server Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/health",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "health"]
+            },
+            "description": "Check if the server is up and running. No authentication required."
+          },
+          "response": [
+            {
+              "name": "200 OK - Server Running",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"message\": \"Server is running\",\n  \"timestamp\": \"2025-01-01T00:00:00.000Z\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "🔐 Auth",
+      "description": "Authentication endpoints. Register creates an admin account. Login returns a JWT token that is auto-saved for use in all protected routes.",
+      "item": [
+        {
+          "name": "Register Admin",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const res = pm.response.json();",
+                  "    if (res.data && res.data.token) {",
+                  "        pm.collectionVariables.set('authToken', res.data.token);",
+                  "        console.log('Token saved:', res.data.token);",
+                  "    }",
+                  "}",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Has token', () => {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.data.token).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Super Admin\",\n  \"email\": \"admin@sumonenterprise.com\",\n  \"password\": \"Admin@123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Register a new admin account. ⚠️ Should be disabled or protected in production.\n\nAuto-saves the JWT token to `authToken` variable on success."
+          },
+          "response": [
+            {
+              "name": "201 Created - Admin Registered",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"success\": true,\n  \"message\": \"Admin registered successfully\",\n  \"data\": {\n    \"admin\": {\n      \"_id\": \"64f5a1b2c3d4e5f6a7b8c9d0\",\n      \"name\": \"Super Admin\",\n      \"email\": \"admin@sumonenterprise.com\",\n      \"role\": \"admin\"\n    },\n    \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"\n  }\n}"
+            },
+            {
+              "name": "400 Bad Request - Admin Exists",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"success\": false,\n  \"error\": {\n    \"message\": \"Admin already exists with this email\",\n    \"statusCode\": 400\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const res = pm.response.json();",
+                  "    if (res.data && res.data.token) {",
+                  "        pm.collectionVariables.set('authToken', res.data.token);",
+                  "        console.log('Token saved:', res.data.token);",
+                  "    }",
+                  "}",
+                  "pm.test('Status is 200', () => pm.response.to.have.status(200));",
+                  "pm.test('Login successful', () => {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "    pm.expect(res.data.token).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@sumonenterprise.com\",\n  \"password\": \"Admin@123456\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Login with admin credentials. The JWT token is automatically saved to the `authToken` collection variable and used in all subsequent protected requests."
+          },
+          "response": [
+            {
+              "name": "200 OK - Login Successful",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"message\": \"Login successful\",\n  \"data\": {\n    \"admin\": {\n      \"_id\": \"64f5a1b2c3d4e5f6a7b8c9d0\",\n      \"name\": \"Super Admin\",\n      \"email\": \"admin@sumonenterprise.com\",\n      \"role\": \"admin\"\n    },\n    \"token\": \"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...\"\n  }\n}"
+            },
+            {
+              "name": "400 Bad Request - Missing Fields",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"success\": false,\n  \"error\": {\n    \"message\": \"Please provide email and password\",\n    \"statusCode\": 400\n  }\n}"
+            },
+            {
+              "name": "401 Unauthorized - Invalid Credentials",
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\n  \"success\": false,\n  \"error\": {\n    \"message\": \"Invalid credentials\",\n    \"statusCode\": 401\n  }\n}"
+            },
+            {
+              "name": "401 Unauthorized - Inactive Account",
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\n  \"success\": false,\n  \"error\": {\n    \"message\": \"Account is inactive\",\n    \"statusCode\": 401\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Current Admin (Me)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Get the currently authenticated admin's profile. Requires a valid Bearer token."
+          },
+          "response": [
+            {
+              "name": "200 OK - Admin Profile",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"_id\": \"64f5a1b2c3d4e5f6a7b8c9d0\",\n    \"name\": \"Super Admin\",\n    \"email\": \"admin@sumonenterprise.com\",\n    \"role\": \"admin\",\n    \"lastLogin\": \"2025-01-01T10:30:00.000Z\"\n  }\n}"
+            },
+            {
+              "name": "401 Unauthorized - No Token",
+              "status": "Unauthorized",
+              "code": 401,
+              "body": "{\n  \"success\": false,\n  \"error\": {\n    \"message\": \"Not authorized, no token\",\n    \"statusCode\": 401\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/logout",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "logout"]
+            },
+            "description": "Logout the current admin. Since JWT is stateless, this returns a success message. Discard the token on the client side."
+          },
+          "response": [
+            {
+              "name": "200 OK - Logged Out",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"message\": \"Logged out successfully\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "[NEGATIVE] Login - Wrong Password",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@sumonenterprise.com\",\n  \"password\": \"wrongpassword\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Negative test: attempt login with wrong password. Expected: 401 Invalid credentials."
+          }
+        },
+        {
+          "name": "[NEGATIVE] Login - Missing Fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"admin@sumonenterprise.com\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Negative test: login without password. Expected: 400 Please provide email and password."
+          }
+        },
+        {
+          "name": "[NEGATIVE] Access Protected Route - No Token",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Negative test: access a protected route without a token. Expected: 401 Not authorized, no token."
+          }
+        },
+        {
+          "name": "[NEGATIVE] Access Protected Route - Invalid Token",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer this.is.not.a.valid.token"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/me",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "me"]
+            },
+            "description": "Negative test: access a protected route with an invalid/malformed token. Expected: 401 Not authorized, token failed."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏗️ Projects (Public)",
+      "description": "Public project endpoints — no authentication required.",
+      "item": [
+        {
+          "name": "Get All Projects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects"]
+            },
+            "description": "Get all projects. Supports filtering, sorting, and pagination."
+          },
+          "response": [
+            {
+              "name": "200 OK - All Projects",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"count\": 2,\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 10,\n    \"total\": 2,\n    \"pages\": 1\n  },\n  \"data\": [\n    {\n      \"_id\": \"64f5a1b2c3d4e5f6a7b8c9d1\",\n      \"projectName\": \"Skyline Tower\",\n      \"company\": \"M/S Sumon Enterprise\",\n      \"status\": \"Ongoing\",\n      \"slug\": \"skyline-tower-ms-sumon-enterprise\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get All Projects - Filter by Status (Ongoing)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects?status=Ongoing",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "Ongoing",
+                  "description": "Filter by status: Ongoing or Finished"
+                }
+              ]
+            },
+            "description": "Filter projects by status=Ongoing"
+          }
+        },
+        {
+          "name": "Get All Projects - Filter by Status (Finished)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects?status=Finished",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "Finished"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Projects - Filter by Company",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects?company=Sumon",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects"],
+              "query": [
+                {
+                  "key": "company",
+                  "value": "Sumon",
+                  "description": "Partial match company name (case-insensitive regex)"
+                }
+              ]
+            },
+            "description": "Filter projects by company name (partial, case-insensitive)"
+          }
+        },
+        {
+          "name": "Get All Projects - Full Text Search",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects?search=tower",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects"],
+              "query": [
+                {
+                  "key": "search",
+                  "value": "tower",
+                  "description": "MongoDB $text search across projectName, description, company"
+                }
+              ]
+            },
+            "description": "Full-text search using MongoDB $text index across projectName, description, and company fields."
+          }
+        },
+        {
+          "name": "Get All Projects - Pagination",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects?page=1&limit=5",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                }
+              ]
+            },
+            "description": "Get page 1 with 5 results per page."
+          }
+        },
+        {
+          "name": "Get All Projects - Sort by startDate ASC",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects?sort=startDate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects"],
+              "query": [
+                {
+                  "key": "sort",
+                  "value": "startDate",
+                  "description": "Ascending; use -startDate for descending"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Projects - Combined Filters",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects?status=Ongoing&page=1&limit=5&sort=-startDate",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "Ongoing"
+                },
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "5"
+                },
+                {
+                  "key": "sort",
+                  "value": "-startDate"
+                }
+              ]
+            },
+            "description": "Combined: filter ongoing projects, page 1, 5 per page, sorted by newest start date."
+          }
+        },
+        {
+          "name": "Get Featured Projects",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects/featured",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects", "featured"]
+            },
+            "description": "Get up to 4 featured projects (featured: true), sorted by newest start date."
+          },
+          "response": [
+            {
+              "name": "200 OK - Featured Projects",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"count\": 2,\n  \"data\": [\n    {\n      \"_id\": \"64f5a1b2c3d4e5f6a7b8c9d1\",\n      \"projectName\": \"Skyline Tower\",\n      \"featured\": true\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Project by Slug",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects/slug/{{projectSlug}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects", "slug", "{{projectSlug}}"]
+            },
+            "description": "Get a single project by its URL slug. The slug is auto-generated from projectName + company."
+          },
+          "response": [
+            {
+              "name": "200 OK - Project Found",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"_id\": \"64f5a1b2c3d4e5f6a7b8c9d1\",\n    \"projectName\": \"Skyline Tower\",\n    \"slug\": \"skyline-tower-ms-sumon-enterprise\"\n  }\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "body": "{\n  \"success\": false,\n  \"error\": {\n    \"message\": \"Project not found\",\n    \"statusCode\": 404\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Project by Slug - Manual",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects/slug/skyline-tower-ms-sumon-enterprise",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects", "slug", "skyline-tower-ms-sumon-enterprise"]
+            },
+            "description": "Get a project by a hardcoded example slug."
+          }
+        },
+        {
+          "name": "Get Project by ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects", "{{projectId}}"]
+            },
+            "description": "Get a single project by its MongoDB ObjectId."
+          }
+        },
+        {
+          "name": "[NEGATIVE] Get Project by ID - Invalid ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects/invalid-object-id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects", "invalid-object-id"]
+            },
+            "description": "Negative test: CastError — should return 404 Resource not found."
+          }
+        },
+        {
+          "name": "[NEGATIVE] Get Project by ID - Non-existent ID",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects/000000000000000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects", "000000000000000000000000"]
+            },
+            "description": "Negative test: valid ObjectId format but no matching document. Expected: 404 Project not found."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🏗️ Projects (Admin - Protected)",
+      "description": "Protected project endpoints. Require Authorization: Bearer {{authToken}} header.",
+      "item": [
+        {
+          "name": "Create Project (JSON Body - No Images)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const res = pm.response.json();",
+                  "    if (res.data && res.data._id) {",
+                  "        pm.collectionVariables.set('projectId', res.data._id);",
+                  "        pm.collectionVariables.set('projectSlug', res.data.slug);",
+                  "        console.log('Project ID saved:', res.data._id);",
+                  "        console.log('Project Slug saved:', res.data.slug);",
+                  "    }",
+                  "}",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Project created', () => {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "    pm.expect(res.data.projectName).to.be.a('string');",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"projectName\": \"Skyline Tower\",\n  \"company\": \"M/S Sumon Enterprise\",\n  \"description\": \"A modern residential tower with state-of-the-art amenities and eco-friendly design in the heart of Dhaka.\",\n  \"address\": {\n    \"plot\": \"12\",\n    \"road\": \"5\",\n    \"block\": \"C\",\n    \"area\": \"Bashundhara R/A\",\n    \"city\": \"Dhaka\"\n  },\n  \"status\": \"Ongoing\",\n  \"startDate\": \"2024-01-15\",\n  \"finishDate\": null,\n  \"specifications\": {\n    \"floors\": \"12\",\n    \"areaPerFloor\": \"2400 sq ft\",\n    \"totalArea\": \"28800 sq ft\",\n    \"constructionType\": \"RCC Frame Structure\"\n  },\n  \"location\": {\n    \"coordinates\": [90.4125, 23.8103]\n  },\n  \"featured\": true\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects"]
+            },
+            "description": "Create a new project using JSON body (no file upload). The project ID and slug are auto-saved to collection variables.\n\n⚠️ Note: When uploading images, use form-data instead."
+          },
+          "response": [
+            {
+              "name": "201 Created - Project Created",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"success\": true,\n  \"message\": \"Project created successfully\",\n  \"data\": {\n    \"_id\": \"64f5a1b2c3d4e5f6a7b8c9d1\",\n    \"projectName\": \"Skyline Tower\",\n    \"company\": \"M/S Sumon Enterprise\",\n    \"slug\": \"skyline-tower-ms-sumon-enterprise\",\n    \"status\": \"Ongoing\",\n    \"featured\": true,\n    \"createdAt\": \"2025-01-01T00:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Create Project (Form-Data with Images)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "projectName",
+                  "value": "Green Valley Residences",
+                  "type": "text"
+                },
+                {
+                  "key": "company",
+                  "value": "M/S Sumon Enterprise",
+                  "type": "text"
+                },
+                {
+                  "key": "description",
+                  "value": "An eco-conscious residential complex with solar panels and rooftop gardens across five towers.",
+                  "type": "text"
+                },
+                {
+                  "key": "address.plot",
+                  "value": "55",
+                  "type": "text"
+                },
+                {
+                  "key": "address.road",
+                  "value": "10",
+                  "type": "text"
+                },
+                {
+                  "key": "address.block",
+                  "value": "B",
+                  "type": "text"
+                },
+                {
+                  "key": "address.area",
+                  "value": "Uttara",
+                  "type": "text"
+                },
+                {
+                  "key": "address.city",
+                  "value": "Dhaka",
+                  "type": "text"
+                },
+                {
+                  "key": "status",
+                  "value": "Ongoing",
+                  "type": "text"
+                },
+                {
+                  "key": "startDate",
+                  "value": "2023-06-01",
+                  "type": "text"
+                },
+                {
+                  "key": "specifications.floors",
+                  "value": "8",
+                  "type": "text"
+                },
+                {
+                  "key": "specifications.areaPerFloor",
+                  "value": "3200 sq ft",
+                  "type": "text"
+                },
+                {
+                  "key": "specifications.totalArea",
+                  "value": "25600 sq ft",
+                  "type": "text"
+                },
+                {
+                  "key": "specifications.constructionType",
+                  "value": "RCC Frame Structure",
+                  "type": "text"
+                },
+                {
+                  "key": "longitude",
+                  "value": "90.3563",
+                  "type": "text"
+                },
+                {
+                  "key": "latitude",
+                  "value": "23.8759",
+                  "type": "text"
+                },
+                {
+                  "key": "featured",
+                  "value": "false",
+                  "type": "text"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": [],
+                  "description": "Select one or more image files (JPEG/PNG/WebP, max 5MB each, max 10 files)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects"]
+            },
+            "description": "Create a project with image file uploads using multipart/form-data.\n\nAttach image files to the `images` field. Accepts up to 10 images.\n\nNote: Use `address.plot`, `address.road` etc. as flat keys in form-data (not nested objects)."
+          }
+        },
+        {
+          "name": "Create Project - Finished with Finish Date",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"projectName\": \"Heritage Plaza\",\n  \"company\": \"M/S Sumon Enterprise\",\n  \"description\": \"A completed commercial plaza with 42 retail units and a food court on the ground floor.\",\n  \"address\": {\n    \"plot\": \"3\",\n    \"road\": \"7\",\n    \"block\": \"A\",\n    \"area\": \"Mirpur\",\n    \"city\": \"Dhaka\"\n  },\n  \"status\": \"Finished\",\n  \"startDate\": \"2020-03-01\",\n  \"finishDate\": \"2022-12-31\",\n  \"specifications\": {\n    \"floors\": \"6\",\n    \"areaPerFloor\": \"5000 sq ft\",\n    \"totalArea\": \"30000 sq ft\",\n    \"constructionType\": \"Steel Frame Structure\"\n  },\n  \"featured\": false\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects"]
+            },
+            "description": "Create a finished project with a finishDate."
+          }
+        },
+        {
+          "name": "Update Project (Full Update)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"projectName\": \"Skyline Tower (Updated)\",\n  \"description\": \"Updated: A luxurious residential tower with premium finishes, rooftop pool, and 24/7 security.\",\n  \"status\": \"Finished\",\n  \"finishDate\": \"2025-06-30\",\n  \"featured\": true,\n  \"specifications.floors\": \"15\",\n  \"specifications.totalArea\": \"36000 sq ft\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/projects/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects", "{{projectId}}"]
+            },
+            "description": "Update an existing project. Only provided fields are updated (partial update supported)."
+          }
+        },
+        {
+          "name": "Update Project (Partial - Status Only)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"Finished\",\n  \"finishDate\": \"2025-03-15\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/projects/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects", "{{projectId}}"]
+            },
+            "description": "Partial update: only update status and finishDate."
+          }
+        },
+        {
+          "name": "Update Project (Form-Data + Add Images)",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "projectName",
+                  "value": "Skyline Tower Pro",
+                  "type": "text"
+                },
+                {
+                  "key": "status",
+                  "value": "Finished",
+                  "type": "text"
+                },
+                {
+                  "key": "finishDate",
+                  "value": "2025-06-30",
+                  "type": "text"
+                },
+                {
+                  "key": "images",
+                  "type": "file",
+                  "src": [],
+                  "description": "New images to add (appended to existing images)"
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/projects/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects", "{{projectId}}"]
+            },
+            "description": "Update project and add new images via form-data. New images are appended to existing images array."
+          }
+        },
+        {
+          "name": "Delete Project",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects/{{projectId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects", "{{projectId}}"]
+            },
+            "description": "Delete a project by ID. Also deletes associated images from Cloudinary or local storage."
+          },
+          "response": [
+            {
+              "name": "200 OK - Deleted",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"message\": \"Project deleted successfully\"\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "body": "{\n  \"success\": false,\n  \"error\": {\n    \"message\": \"Project not found\",\n    \"statusCode\": 404\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "[NEGATIVE] Create Project - Missing Required Fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"projectName\": \"AB\",\n  \"company\": \"\",\n  \"status\": \"InvalidStatus\",\n  \"startDate\": \"not-a-date\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects"]
+            },
+            "description": "Negative test: missing required fields and invalid values. Expected: 400 Validation failed with field-level errors."
+          }
+        },
+        {
+          "name": "[NEGATIVE] Create Project - No Auth Token",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"projectName\": \"Ghost Project\",\n  \"company\": \"Unknown\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/projects",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects"]
+            },
+            "description": "Negative test: attempt to create a project without auth token. Expected: 401 Not authorized, no token."
+          }
+        },
+        {
+          "name": "[NEGATIVE] Delete Project - Non-existent ID",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects/000000000000000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects", "000000000000000000000000"]
+            },
+            "description": "Negative test: delete a project that doesn't exist. Expected: 404 Project not found."
+          }
+        }
+      ]
+    },
+    {
+      "name": "📩 Inquiries (Public)",
+      "description": "Public inquiry endpoint — no authentication required. Allows website visitors to submit contact form inquiries.",
+      "item": [
+        {
+          "name": "Submit Inquiry (Contact Form)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) {",
+                  "    const res = pm.response.json();",
+                  "    if (res.data && res.data._id) {",
+                  "        pm.collectionVariables.set('inquiryId', res.data._id);",
+                  "        console.log('Inquiry ID saved:', res.data._id);",
+                  "    }",
+                  "}",
+                  "pm.test('Status is 201', () => pm.response.to.have.status(201));",
+                  "pm.test('Inquiry submitted', () => {",
+                  "    const res = pm.response.json();",
+                  "    pm.expect(res.success).to.be.true;",
+                  "});"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rahman Ahmed\",\n  \"email\": \"rahman.ahmed@example.com\",\n  \"phone\": \"01712345678\",\n  \"subject\": \"Project Inquiry for Bashundhara\",\n  \"message\": \"I am interested in purchasing a unit in your upcoming Bashundhara project. Please send me the floor plan and pricing details.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries"]
+            },
+            "description": "Submit a contact form inquiry. No authentication required. Triggers email notifications to the admin and a confirmation email to the user.\n\nInquiry ID is auto-saved to `inquiryId` variable."
+          },
+          "response": [
+            {
+              "name": "201 Created - Inquiry Submitted",
+              "status": "Created",
+              "code": 201,
+              "body": "{\n  \"success\": true,\n  \"message\": \"Inquiry submitted successfully. We will contact you soon.\",\n  \"data\": {\n    \"_id\": \"64f5a1b2c3d4e5f6a7b8c9d2\",\n    \"name\": \"Rahman Ahmed\",\n    \"email\": \"rahman.ahmed@example.com\",\n    \"phone\": \"01712345678\",\n    \"subject\": \"Project Inquiry for Bashundhara\",\n    \"status\": \"unread\",\n    \"createdAt\": \"2025-01-01T00:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Submit Inquiry - Minimal Valid Data",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Ali Khan\",\n  \"email\": \"ali.khan@gmail.com\",\n  \"phone\": \"01987654321\",\n  \"subject\": \"General inquiry\",\n  \"message\": \"I would like to know more about your services and ongoing projects.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries"]
+            },
+            "description": "Another valid inquiry submission."
+          }
+        },
+        {
+          "name": "[NEGATIVE] Submit Inquiry - Missing Required Fields",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"A\",\n  \"email\": \"not-a-valid-email\",\n  \"phone\": \"\",\n  \"subject\": \"Hi\",\n  \"message\": \"Short\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries"]
+            },
+            "description": "Negative test: all fields fail validation:\n- name too short (min 2)\n- invalid email format\n- empty phone\n- subject too short (min 5)\n- message too short (min 10)\n\nExpected: 400 Validation failed with errors array."
+          },
+          "response": [
+            {
+              "name": "400 Validation Failed",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"success\": false,\n  \"error\": {\n    \"message\": \"Validation failed\",\n    \"statusCode\": 400,\n    \"errors\": [\n      { \"field\": \"name\", \"message\": \"Name must be at least 2 characters\" },\n      { \"field\": \"email\", \"message\": \"Please provide a valid email address\" },\n      { \"field\": \"phone\", \"message\": \"Phone number is required\" },\n      { \"field\": \"subject\", \"message\": \"Subject must be at least 5 characters\" },\n      { \"field\": \"message\", \"message\": \"Message must be at least 10 characters\" }\n    ]\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "[NEGATIVE] Submit Inquiry - Empty Body",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries"]
+            },
+            "description": "Negative test: submit completely empty body. Expected: 400 Validation failed with all fields required."
+          }
+        },
+        {
+          "name": "[NEGATIVE] Submit Inquiry - Invalid Phone Format",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Test User\",\n  \"email\": \"test@example.com\",\n  \"phone\": \"abc-xyz\",\n  \"subject\": \"Test Subject Here\",\n  \"message\": \"This is a valid test message for the inquiry form.\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries"]
+            },
+            "description": "Negative test: invalid phone number format. Expected: 400 Please provide a valid phone number."
+          }
+        }
+      ]
+    },
+    {
+      "name": "📩 Inquiries (Admin - Protected)",
+      "description": "Admin-only inquiry management endpoints. All require Bearer token authentication.",
+      "item": [
+        {
+          "name": "Get All Inquiries",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries"]
+            },
+            "description": "Get all inquiries (admin only). Supports filtering by status and pagination."
+          },
+          "response": [
+            {
+              "name": "200 OK - All Inquiries",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"count\": 2,\n  \"pagination\": {\n    \"page\": 1,\n    \"limit\": 20,\n    \"total\": 2,\n    \"pages\": 1\n  },\n  \"data\": [\n    {\n      \"_id\": \"64f5a1b2c3d4e5f6a7b8c9d2\",\n      \"name\": \"Rahman Ahmed\",\n      \"email\": \"rahman@example.com\",\n      \"status\": \"unread\",\n      \"createdAt\": \"2025-01-01T00:00:00.000Z\"\n    }\n  ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get All Inquiries - Filter by Status (unread)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries?status=unread",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "unread",
+                  "description": "Values: unread, read, replied"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Inquiries - Filter by Status (read)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries?status=read",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "read"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Inquiries - Filter by Status (replied)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries?status=replied",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries"],
+              "query": [
+                {
+                  "key": "status",
+                  "value": "replied"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get All Inquiries - With Pagination",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries?page=1&limit=10",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries"],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "1"
+                },
+                {
+                  "key": "limit",
+                  "value": "10"
+                }
+              ]
+            }
+          }
+        },
+        {
+          "name": "Get Inquiry Stats",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries/stats",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries", "stats"]
+            },
+            "description": "Get inquiry statistics: total count, unread count, read count, and replied count."
+          },
+          "response": [
+            {
+              "name": "200 OK - Stats",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"data\": {\n    \"total\": 25,\n    \"unread\": 10,\n    \"read\": 8,\n    \"replied\": 7\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Single Inquiry by ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries/{{inquiryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries", "{{inquiryId}}"]
+            },
+            "description": "Get a single inquiry by ID (admin only)."
+          }
+        },
+        {
+          "name": "Update Inquiry Status - Mark as Read",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"read\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries/{{inquiryId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries", "{{inquiryId}}", "status"]
+            },
+            "description": "Mark an inquiry as read. Also sets the `readAt` timestamp."
+          },
+          "response": [
+            {
+              "name": "200 OK - Status Updated",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"message\": \"Inquiry status updated successfully\",\n  \"data\": {\n    \"_id\": \"64f5a1b2c3d4e5f6a7b8c9d2\",\n    \"status\": \"read\",\n    \"readAt\": \"2025-01-01T10:00:00.000Z\"\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Inquiry Status - Mark as Replied",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"replied\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries/{{inquiryId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries", "{{inquiryId}}", "status"]
+            },
+            "description": "Mark an inquiry as replied."
+          }
+        },
+        {
+          "name": "Update Inquiry Status - Mark as Unread",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"unread\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries/{{inquiryId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries", "{{inquiryId}}", "status"]
+            },
+            "description": "Re-mark an inquiry as unread."
+          }
+        },
+        {
+          "name": "Delete Inquiry",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries/{{inquiryId}}",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries", "{{inquiryId}}"]
+            },
+            "description": "Permanently delete an inquiry by ID."
+          },
+          "response": [
+            {
+              "name": "200 OK - Deleted",
+              "status": "OK",
+              "code": 200,
+              "body": "{\n  \"success\": true,\n  \"message\": \"Inquiry deleted successfully\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "[NEGATIVE] Get Inquiries - No Auth",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries"]
+            },
+            "description": "Negative test: access admin inquiries list without token. Expected: 401 Not authorized, no token."
+          }
+        },
+        {
+          "name": "[NEGATIVE] Update Inquiry Status - Invalid Status",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"pending\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries/{{inquiryId}}/status",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries", "{{inquiryId}}", "status"]
+            },
+            "description": "Negative test: invalid status value (not in enum: unread, read, replied). Expected: 400 Validation failed."
+          }
+        },
+        {
+          "name": "[NEGATIVE] Get Inquiry - Non-existent ID",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{authToken}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/api/inquiries/000000000000000000000000",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "inquiries", "000000000000000000000000"]
+            },
+            "description": "Negative test: get an inquiry with a valid but non-existent ID. Expected: 404 Inquiry not found."
+          }
+        }
+      ]
+    },
+    {
+      "name": "🚫 Error & Edge Cases",
+      "description": "Tests for global error handling, 404 routes, and rate limiting.",
+      "item": [
+        {
+          "name": "404 - Route Not Found",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/non-existent-route",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "non-existent-route"]
+            },
+            "description": "Test the global 404 handler. Expected: { success: false, error: { message: 'Route not found', statusCode: 404 } }"
+          },
+          "response": [
+            {
+              "name": "404 Route Not Found",
+              "status": "Not Found",
+              "code": 404,
+              "body": "{\n  \"success\": false,\n  \"error\": {\n    \"message\": \"Route not found\",\n    \"statusCode\": 404\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "CastError - Invalid MongoDB ObjectId",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/projects/not-valid-id",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "projects", "not-valid-id"]
+            },
+            "description": "Tests Mongoose CastError handling. Passing a non-ObjectId string triggers the error handler, which returns 404 Resource not found."
+          },
+          "response": [
+            {
+              "name": "404 CastError",
+              "status": "Not Found",
+              "code": 404,
+              "body": "{\n  \"success\": false,\n  \"error\": {\n    \"message\": \"Resource not found\",\n    \"statusCode\": 404\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Duplicate Key Error - Register Same Email",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Another Admin\",\n  \"email\": \"admin@sumonenterprise.com\",\n  \"password\": \"Password123\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "register"]
+            },
+            "description": "Tests duplicate key error. Registering with the same email twice triggers a 400 error with the authController check OR a 409 from the global error handler (MongoDB duplicate key)."
+          },
+          "response": [
+            {
+              "name": "400 Already Exists",
+              "status": "Bad Request",
+              "code": 400,
+              "body": "{\n  \"success\": false,\n  \"error\": {\n    \"message\": \"Admin already exists with this email\",\n    \"statusCode\": 400\n  }\n}"
+            }
+          ]
+        },
+        {
+          "name": "Wrong HTTP Method",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": ["{{baseUrl}}"],
+              "path": ["api", "auth", "login"]
+            },
+            "description": "Send DELETE to a POST-only route. Express returns 404 since no DELETE handler is registered for /api/auth/login."
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -3,6 +3,7 @@ const cors = require('cors');
 const helmet = require('helmet');
 const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
+const path = require('path');
 
 const errorHandler = require('./middleware/errorHandler');
 const authRoutes = require('./routes/authRoutes');
@@ -11,66 +12,65 @@ const inquiryRoutes = require('./routes/inquiryRoutes');
 
 const app = express();
 
-app.set('trust proxy', 1);
-
-// Security
+// Security middleware
 app.use(helmet());
 
-// CORS
-const allowedOrigins = [
-  'http://localhost:5173',
-  process.env.FRONTEND_URL,
-];
-
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-  })
-);
+// CORS configuration
+const corsOptions = {
+  origin: process.env.FRONTEND_URL || 'http://localhost:5173',
+  credentials: true,
+};
+app.use(cors(corsOptions));
 
 // Body parser
 app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 
-// Logging (dev only)
+// Logging
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
 // Rate limiting
 const limiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
+  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+  message: {
+    success: false,
+    error: {
+      message: 'Too many requests, please try again later.',
+      statusCode: 429,
+    },
+  },
 });
 
 app.use('/api/', limiter);
 
-// Health check
-app.get('/api/health', (req, res) => {
+// Serve static files (uploaded images)
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Health check route
+app.get('/api/ok', (req, res) => {
   res.json({
     success: true,
     message: 'Server is running',
-    environment: process.env.NODE_ENV,
+    timestamp: new Date().toISOString(),
   });
 });
 
-// Routes
+// API routes
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/inquiries', inquiryRoutes);
 
-// 404
+// 404 handler
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    message: 'Route not found',
+    error: {
+      message: 'Route not found',
+      statusCode: 404,
+    },
   });
 });
 

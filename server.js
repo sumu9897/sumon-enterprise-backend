@@ -1,17 +1,36 @@
 require('dotenv').config();
-const app = require('../src/app');
-const connectDB = require('../src/config/database');
+const app = require('./app');
+const connectDB = require('./config/database');
 
-// Connect DB (serverless safe)
-let isConnected = false;
+// Handle uncaught exceptions
+process.on('uncaughtException', (err) => {
+  console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+  console.error(err.name, err.message);
+  process.exit(1);
+});
 
-async function handler(req, res) {
-  if (!isConnected) {
-    await connectDB();
-    isConnected = true;
-  }
+// Connect to database
+connectDB();
 
-  return app(req, res);
-}
+const PORT = process.env.PORT || 5002;
 
-module.exports = handler;
+const server = app.listen(PORT, () => {
+  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+  console.error('UNHANDLED REJECTION! 💥 Shutting down...');
+  console.error(err.name, err.message);
+  server.close(() => {
+    process.exit(1);
+  });
+});
+
+// Graceful shutdown
+process.on('SIGTERM', () => {
+  console.log('👋 SIGTERM RECEIVED. Shutting down gracefully');
+  server.close(() => {
+    console.log('💥 Process terminated!');
+  });
+});
