@@ -4,9 +4,9 @@ const connectDB = require('./config/database');
 
 // Handle uncaught exceptions
 process.on('uncaughtException', (err) => {
-  console.error('UNCAUGHT EXCEPTION! 💥 Shutting down...');
+  console.error('UNCAUGHT EXCEPTION! 💥');
   console.error(err.name, err.message);
-  process.exit(1);
+  // Don't exit on Vercel - let it handle errors
 });
 
 // Connect to database
