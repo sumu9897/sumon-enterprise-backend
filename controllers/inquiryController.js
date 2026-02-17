@@ -1,41 +1,75 @@
 const Inquiry = require('../models/Inquiry');
-const { sendInquiryNotification, sendInquiryConfirmation } = require('../utils/sendEmail');
+const { sendInquiryNotification, sendInquiryConfirmation } = require('../utils/emailService');
 
-// @desc    Get all inquiries
+// @desc    Create new inquiry (public)
+// @route   POST /api/inquiries
+// @access  Public
+const createInquiry = async (req, res, next) => {
+  try {
+    // Extract exactly the fields the frontend sends
+    const { name, email, phone, subject, message } = req.body;
+
+    // Create inquiry in database
+    const inquiry = await Inquiry.create({
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
+      phone: phone.trim(),
+      subject: subject.trim(),
+      message: message.trim(),
+    });
+
+    // Send emails in background (don't block response)
+    Promise.all([
+      sendInquiryNotification(inquiry).catch(err =>
+        console.error('Admin notification email failed:', err)
+      ),
+      sendInquiryConfirmation(inquiry).catch(err =>
+        console.error('Confirmation email failed:', err)
+      ),
+    ]);
+
+    res.status(201).json({
+      success: true,
+      message: 'Inquiry submitted successfully',
+      data: {
+        id: inquiry._id,
+        name: inquiry.name,
+        email: inquiry.email,
+        subject: inquiry.subject,
+        createdAt: inquiry.createdAt,
+      },
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
+// @desc    Get all inquiries (admin)
 // @route   GET /api/inquiries
-// @access  Private
+// @access  Private/Admin
 const getInquiries = async (req, res, next) => {
   try {
-    const { status, page = 1, limit = 20, sort = '-createdAt' } = req.query;
+    const { status, page = 1, limit = 20 } = req.query;
 
-    // Build query
     const query = {};
+    if (status) query.status = status;
 
-    if (status) {
-      query.status = status;
-    }
-
-    // Calculate pagination
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
-    const skip = (pageNum - 1) * limitNum;
-
-    // Execute query
-    const inquiries = await Inquiry.find(query)
-      .sort(sort)
-      .skip(skip)
-      .limit(limitNum);
-
+    const skip = (parseInt(page) - 1) * parseInt(limit);
     const total = await Inquiry.countDocuments(query);
 
-    res.json({
+    const inquiries = await Inquiry.find(query)
+      .sort({ createdAt: -1 })
+      .skip(skip)
+      .limit(parseInt(limit));
+
+    res.status(200).json({
       success: true,
       count: inquiries.length,
       pagination: {
-        page: pageNum,
-        limit: limitNum,
+        page: parseInt(page),
+        limit: parseInt(limit),
         total,
-        pages: Math.ceil(total / limitNum),
+        pages: Math.ceil(total / parseInt(limit)),
       },
       data: inquiries,
     });
@@ -44,132 +78,72 @@ const getInquiries = async (req, res, next) => {
   }
 };
 
-// @desc    Get single inquiry
+// @desc    Get single inquiry (admin)
 // @route   GET /api/inquiries/:id
-// @access  Private
+// @access  Private/Admin
 const getInquiryById = async (req, res, next) => {
   try {
     const inquiry = await Inquiry.findById(req.params.id);
-
     if (!inquiry) {
       return res.status(404).json({
         success: false,
-        error: {
-          message: 'Inquiry not found',
-          statusCode: 404,
-        },
+        error: { message: 'Inquiry not found', statusCode: 404 },
       });
     }
-
-    res.json({
-      success: true,
-      data: inquiry,
-    });
+    res.status(200).json({ success: true, data: inquiry });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Create new inquiry (Contact form submission)
-// @route   POST /api/inquiries
-// @access  Public
-const createInquiry = async (req, res, next) => {
-  try {
-    const { name, email, phone, subject, message } = req.body;
-
-    // Get IP address and user agent
-    const ipAddress = req.ip || req.connection.remoteAddress;
-    const userAgent = req.get('user-agent');
-
-    const inquiry = await Inquiry.create({
-      name,
-      email,
-      phone,
-      subject,
-      message,
-      ipAddress,
-      userAgent,
-    });
-
-    // Send email notifications
-    try {
-      await Promise.all([
-        sendInquiryNotification(inquiry),
-        sendInquiryConfirmation(inquiry),
-      ]);
-    } catch (emailError) {
-      console.error('Error sending emails:', emailError);
-      // Don't fail the request if email fails
-    }
-
-    res.status(201).json({
-      success: true,
-      message: 'Inquiry submitted successfully. We will contact you soon.',
-      data: inquiry,
-    });
-  } catch (error) {
-    next(error);
-  }
-};
-
-// @desc    Update inquiry status
+// @desc    Update inquiry status (admin)
 // @route   PUT /api/inquiries/:id/status
-// @access  Private
+// @access  Private/Admin
 const updateInquiryStatus = async (req, res, next) => {
   try {
     const { status } = req.body;
 
-    let inquiry = await Inquiry.findById(req.params.id);
+    if (!['unread', 'read', 'replied'].includes(status)) {
+      return res.status(400).json({
+        success: false,
+        error: { message: 'Invalid status value', statusCode: 400 },
+      });
+    }
+
+    const inquiry = await Inquiry.findByIdAndUpdate(
+      req.params.id,
+      { status },
+      { new: true, runValidators: true }
+    );
 
     if (!inquiry) {
       return res.status(404).json({
         success: false,
-        error: {
-          message: 'Inquiry not found',
-          statusCode: 404,
-        },
+        error: { message: 'Inquiry not found', statusCode: 404 },
       });
     }
 
-    inquiry.status = status;
-    
-    // Set readAt timestamp when marked as read
-    if (status === 'read' && !inquiry.readAt) {
-      inquiry.readAt = Date.now();
-    }
-
-    await inquiry.save();
-
-    res.json({
-      success: true,
-      message: 'Inquiry status updated successfully',
-      data: inquiry,
-    });
+    res.status(200).json({ success: true, data: inquiry });
   } catch (error) {
     next(error);
   }
 };
 
-// @desc    Delete inquiry
+// @desc    Delete inquiry (admin)
 // @route   DELETE /api/inquiries/:id
-// @access  Private
+// @access  Private/Admin
 const deleteInquiry = async (req, res, next) => {
   try {
-    const inquiry = await Inquiry.findById(req.params.id);
+    const inquiry = await Inquiry.findByIdAndDelete(req.params.id);
 
     if (!inquiry) {
       return res.status(404).json({
         success: false,
-        error: {
-          message: 'Inquiry not found',
-          statusCode: 404,
-        },
+        error: { message: 'Inquiry not found', statusCode: 404 },
       });
     }
 
-    await inquiry.deleteOne();
-
-    res.json({
+    res.status(200).json({
       success: true,
       message: 'Inquiry deleted successfully',
     });
@@ -178,24 +152,21 @@ const deleteInquiry = async (req, res, next) => {
   }
 };
 
-// @desc    Get inquiry statistics
+// @desc    Get inquiry stats (admin)
 // @route   GET /api/inquiries/stats
-// @access  Private
+// @access  Private/Admin
 const getInquiryStats = async (req, res, next) => {
   try {
-    const total = await Inquiry.countDocuments();
-    const unread = await Inquiry.countDocuments({ status: 'unread' });
-    const read = await Inquiry.countDocuments({ status: 'read' });
-    const replied = await Inquiry.countDocuments({ status: 'replied' });
+    const [total, unread, read, replied] = await Promise.all([
+      Inquiry.countDocuments(),
+      Inquiry.countDocuments({ status: 'unread' }),
+      Inquiry.countDocuments({ status: 'read' }),
+      Inquiry.countDocuments({ status: 'replied' }),
+    ]);
 
-    res.json({
+    res.status(200).json({
       success: true,
-      data: {
-        total,
-        unread,
-        read,
-        replied,
-      },
+      data: { total, unread, read, replied },
     });
   } catch (error) {
     next(error);
@@ -203,9 +174,9 @@ const getInquiryStats = async (req, res, next) => {
 };
 
 module.exports = {
+  createInquiry,
   getInquiries,
   getInquiryById,
-  createInquiry,
   updateInquiryStatus,
   deleteInquiry,
   getInquiryStats,

@@ -12,9 +12,10 @@
     "construction",
     "api",
     "mern",
-    "express"
+    "express",
+    "contractor"
   ],
-  "author": "M/S SUMON ENTERPRISE",
+  "author": "Mohammad Sumon",
   "license": "ISC",
   "dependencies": {
     "express": "^4.18.2",

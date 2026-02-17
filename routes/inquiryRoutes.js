@@ -1,33 +1,34 @@
 const express = require('express');
 const router = express.Router();
 const {
+  createInquiry,
   getInquiries,
   getInquiryById,
-  createInquiry,
   updateInquiryStatus,
   deleteInquiry,
   getInquiryStats,
 } = require('../controllers/inquiryController');
-const { protect } = require('../middleware/authMiddleware');
-const inquiryValidators = require('../validators/inquiryValidator');
-const validate = require('../middleware/validateMiddleware');
-// Public routes
-router.post(
-  '/',
-  inquiryValidators.createInquiry,
-  validate,
-  createInquiry
-);
-// Protected routes (Admin only)
-router.get('/', protect, getInquiries);
+const { validateInquiry } = require('../validators/inquiryValidator');
+const { protect } = require('../middleware/auth');
+
+// ── Public ──────────────────────────────────────────
+// POST /api/inquiries — submit contact form
+router.post('/', validateInquiry, createInquiry);
+
+// ── Protected (Admin) ───────────────────────────────
+// GET  /api/inquiries/stats
 router.get('/stats', protect, getInquiryStats);
+
+// GET  /api/inquiries
+router.get('/', protect, getInquiries);
+
+// GET  /api/inquiries/:id
 router.get('/:id', protect, getInquiryById);
-router.put(
-  '/:id/status',
-  protect,
-  inquiryValidators.updateStatus,
-  validate,
-  updateInquiryStatus
-);
+
+// PUT  /api/inquiries/:id/status
+router.put('/:id/status', protect, updateInquiryStatus);
+
+// DELETE /api/inquiries/:id
 router.delete('/:id', protect, deleteInquiry);
+
 module.exports = router;

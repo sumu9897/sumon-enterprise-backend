@@ -6,16 +6,15 @@ const inquirySchema = new mongoose.Schema(
       type: String,
       required: [true, 'Please provide your name'],
       trim: true,
+      minlength: [2, 'Name must be at least 2 characters'],
+      maxlength: [100, 'Name must not exceed 100 characters'],
     },
     email: {
       type: String,
       required: [true, 'Please provide your email'],
       trim: true,
       lowercase: true,
-      match: [
-        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-        'Please provide a valid email',
-      ],
+      match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email'],
     },
     phone: {
       type: String,
@@ -24,37 +23,28 @@ const inquirySchema = new mongoose.Schema(
     },
     subject: {
       type: String,
-      required: [true, 'Please provide subject'],
+      required: [true, 'Please provide a subject'],
       trim: true,
+      minlength: [3, 'Subject must be at least 3 characters'],
+      maxlength: [200, 'Subject must not exceed 200 characters'],
     },
     message: {
       type: String,
-      required: [true, 'Please provide your message'],
+      required: [true, 'Please provide a message'],
+      trim: true,
+      minlength: [10, 'Message must be at least 10 characters'],
+      maxlength: [2000, 'Message must not exceed 2000 characters'],
     },
     status: {
       type: String,
       enum: ['unread', 'read', 'replied'],
       default: 'unread',
     },
-    ipAddress: {
-      type: String,
-    },
-    userAgent: {
-      type: String,
-    },
-    readAt: {
-      type: Date,
-    },
   },
   {
     timestamps: true,
   }
 );
-
-// Create indexes
-inquirySchema.index({ email: 1 });
-inquirySchema.index({ status: 1 });
-inquirySchema.index({ createdAt: -1 });
 
 const Inquiry = mongoose.model('Inquiry', inquirySchema);
 
