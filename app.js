@@ -12,89 +12,92 @@ const inquiryRoutes = require('./routes/inquiryRoutes');
 
 const app = express();
 
-// Security middleware
-app.use(helmet());
-
-// CORS configuration - FIXED to allow both localhost and production
+// ── Allowed origins ──────────────────────────────────────────────────────────
 const allowedOrigins = [
   'http://localhost:5173',
   'http://localhost:3000',
   'https://sumon-enterprise.vercel.app',
-  process.env.FRONTEND_URL
-].filter(Boolean); // Remove undefined values
+  process.env.FRONTEND_URL,
+].filter(Boolean);
 
+// ── CORS options ─────────────────────────────────────────────────────────────
 const corsOptions = {
   origin: function (origin, callback) {
-    // Allow requests with no origin (like mobile apps, curl, Postman)
+    // Allow requests with no origin (Postman, mobile apps, curl)
     if (!origin) return callback(null, true);
-    
-    if (allowedOrigins.indexOf(origin) !== -1) {
-      callback(null, true);
-    } else {
-      console.log('Blocked origin:', origin);
-      callback(new Error('Not allowed by CORS'));
-    }
+    if (allowedOrigins.includes(origin)) return callback(null, true);
+    console.warn('Blocked by CORS:', origin);
+    callback(new Error('Not allowed by CORS'));
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
+  optionsSuccessStatus: 200, // ← critical for Vercel (some browsers send 204 which Vercel blocks)
 };
 
+// ── MUST be before every other middleware ────────────────────────────────────
 app.use(cors(corsOptions));
 
-// Body parser
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+// ── Handle OPTIONS preflight for ALL routes explicitly ───────────────────────
+app.options('*', cors(corsOptions));
 
-// Logging
+// ── Security middleware ──────────────────────────────────────────────────────
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' }, // allow images/assets cross-origin
+  })
+);
+
+// ── Body parser ──────────────────────────────────────────────────────────────
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// ── Logging ──────────────────────────────────────────────────────────────────
 if (process.env.NODE_ENV === 'development') {
   app.use(morgan('dev'));
 }
 
-// Rate limiting
+// ── Rate limiting ─────────────────────────────────────────────────────────────
 const limiter = rateLimit({
   windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000,
   max: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS) || 100,
+  standardHeaders: true,
+  legacyHeaders: false,
   message: {
     success: false,
-    error: {
-      message: 'Too many requests, please try again later.',
-      statusCode: 429,
-    },
+    error: { message: 'Too many requests, please try again later.', statusCode: 429 },
   },
 });
-
 app.use('/api/', limiter);
 
-// Serve static files (uploaded images)
+// ── Static files ──────────────────────────────────────────────────────────────
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
-// Health check route
+// ── Health check ──────────────────────────────────────────────────────────────
 app.get('/api/health', (req, res) => {
-  res.json({
+  res.status(200).json({
     success: true,
     message: 'Server is running',
+    environment: process.env.NODE_ENV,
     timestamp: new Date().toISOString(),
+    allowedOrigins,
   });
 });
 
-// API routes
-app.use('/api/auth', authRoutes);
-app.use('/api/projects', projectRoutes);
+// ── API Routes ────────────────────────────────────────────────────────────────
+app.use('/api/auth',      authRoutes);
+app.use('/api/projects',  projectRoutes);
 app.use('/api/inquiries', inquiryRoutes);
 
-// 404 handler
+// ── 404 handler ───────────────────────────────────────────────────────────────
 app.use((req, res) => {
   res.status(404).json({
     success: false,
-    error: {
-      message: 'Route not found',
-      statusCode: 404,
-    },
+    error: { message: `Route ${req.originalUrl} not found`, statusCode: 404 },
   });
 });
 
-// Error handler
+// ── Global error handler ──────────────────────────────────────────────────────
 app.use(errorHandler);
 
 module.exports = app;
