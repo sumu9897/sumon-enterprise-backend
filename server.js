@@ -1,36 +1,44 @@
+// !! dotenv MUST be the very first line — before any other require !!
 require('dotenv').config();
-const app = require('./app');
-const connectDB = require('./config/database');
 
-// Handle uncaught exceptions
-process.on('uncaughtException', (err) => {
-  console.error('UNCAUGHT EXCEPTION! 💥');
-  console.error(err.name, err.message);
-  // Don't exit on Vercel - let it handle errors
-});
+const mongoose = require('mongoose');
+const app      = require('./app');
 
-// Connect to database
-connectDB();
+const PORT = process.env.PORT || 5000;
 
-const PORT = process.env.PORT || 5002;
+// ── Connect to MongoDB then start ────────────────────────────────
+const startServer = async () => {
+  try {
+    if (!process.env.MONGODB_URI) {
+      throw new Error('MONGODB_URI environment variable is not set!');
+    }
 
-const server = app.listen(PORT, () => {
-  console.log(`Server running in ${process.env.NODE_ENV} mode on port ${PORT}`);
-});
+    await mongoose.connect(process.env.MONGODB_URI, {
+      serverSelectionTimeoutMS: 10000,
+    });
+
+    console.log('✅ MongoDB Connected');
+
+    app.listen(PORT, () => {
+      console.log(`✅ Server running on port ${PORT}`);
+    });
+
+  } catch (error) {
+    console.error('❌ Server startup failed:', error.message);
+    // On Vercel, don't call process.exit() — it kills the function permanently
+    // Instead let the error handler in app.js deal with requests
+  }
+};
+
+startServer();
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {
-  console.error('UNHANDLED REJECTION! 💥 Shutting down...');
-  console.error(err.name, err.message);
-  server.close(() => {
-    process.exit(1);
-  });
+  console.error('Unhandled Rejection:', err.message);
 });
 
-// Graceful shutdown
-process.on('SIGTERM', () => {
-  console.log('👋 SIGTERM RECEIVED. Shutting down gracefully');
-  server.close(() => {
-    console.log('💥 Process terminated!');
-  });
+process.on('uncaughtException', (err) => {
+  console.error('Uncaught Exception:', err.message);
 });
+
+module.exports = app;
