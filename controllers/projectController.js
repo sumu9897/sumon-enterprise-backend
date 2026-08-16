@@ -2,6 +2,20 @@ const Project = require('../models/Project');
 const cloudinary = require('../config/cloudinary');
 const fs = require('fs').promises;
 const path = require('path');
+const slugify = require('slugify');
+
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const SORT_OPTIONS = new Set(['startDate', '-startDate', 'projectName', '-projectName', 'createdAt', '-createdAt']);
+
+const parseCoordinates = (value) => {
+  const coordinates = Array.isArray(value) ? value : JSON.parse(value);
+  if (coordinates.length !== 2) throw Object.assign(new Error('Coordinates must contain longitude and latitude'), { statusCode: 400 });
+  const numbers = coordinates.map(Number);
+  if (!Number.isFinite(numbers[0]) || !Number.isFinite(numbers[1]) || numbers[0] < -180 || numbers[0] > 180 || numbers[1] < -90 || numbers[1] > 90) {
+    throw Object.assign(new Error('Coordinates are outside the valid range'), { statusCode: 400 });
+  }
+  return numbers;
+};
 
 // @desc    Get all projects
 // @route   GET /api/projects
@@ -18,25 +32,23 @@ const getProjects = async (req, res, next) => {
     }
 
     if (company) {
-      query.company = new RegExp(company, 'i');
+      query.company = new RegExp(escapeRegex(String(company).slice(0, 100)), 'i');
     }
 
     if (search) {
-      query.$text = { $search: search };
+      query.$text = { $search: String(search).slice(0, 100) };
     }
 
     // Calculate pagination
-    const pageNum = parseInt(page, 10);
-    const limitNum = parseInt(limit, 10);
+    const pageNum = Math.max(1, Number.parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 10));
     const skip = (pageNum - 1) * limitNum;
+    const sortOption = SORT_OPTIONS.has(sort) ? sort : '-startDate';
 
-    // Execute query
-    const projects = await Project.find(query)
-      .sort(sort)
-      .skip(skip)
-      .limit(limitNum);
-
-    const total = await Project.countDocuments(query);
+    const [projects, total] = await Promise.all([
+      Project.find(query).sort(sortOption).skip(skip).limit(limitNum),
+      Project.countDocuments(query),
+    ]);
 
     res.json({
       success: true,
@@ -155,15 +167,14 @@ const createProject = async (req, res, next) => {
 
     // Handle location coordinates
     if (req.body['location.coordinates']) {
-      const coords = JSON.parse(req.body['location.coordinates']);
       projectData.location = {
         type: 'Point',
-        coordinates: coords,
+        coordinates: parseCoordinates(req.body['location.coordinates']),
       };
     } else if (req.body.longitude && req.body.latitude) {
       projectData.location = {
         type: 'Point',
-        coordinates: [parseFloat(req.body.longitude), parseFloat(req.body.latitude)],
+        coordinates: parseCoordinates([req.body.longitude, req.body.latitude]),
       };
     }
 
@@ -251,6 +262,15 @@ const updateProject = async (req, res, next) => {
     if (req.body.finishDate !== undefined) updateData.finishDate = req.body.finishDate;
     if (req.body.featured !== undefined) updateData.featured = req.body.featured === 'true' || req.body.featured === true;
 
+    if (req.body.projectName || req.body.company) {
+      const baseSlug = slugify(
+        `${req.body.projectName || project.projectName} ${req.body.company || project.company}`,
+        { lower: true, strict: true },
+      );
+      const collision = await Project.exists({ slug: baseSlug, _id: { $ne: project._id } });
+      updateData.slug = collision ? `${baseSlug}-${String(project._id).slice(-6)}` : baseSlug;
+    }
+
     // Handle address updates
     if (req.body['address.plot'] || req.body.plot) {
       updateData['address.plot'] = req.body['address.plot'] || req.body.plot;
@@ -284,15 +304,14 @@ const updateProject = async (req, res, next) => {
 
     // Handle location updates
     if (req.body['location.coordinates']) {
-      const coords = JSON.parse(req.body['location.coordinates']);
       updateData.location = {
         type: 'Point',
-        coordinates: coords,
+        coordinates: parseCoordinates(req.body['location.coordinates']),
       };
     } else if (req.body.longitude && req.body.latitude) {
       updateData.location = {
         type: 'Point',
-        coordinates: [parseFloat(req.body.longitude), parseFloat(req.body.latitude)],
+        coordinates: parseCoordinates([req.body.longitude, req.body.latitude]),
       };
     }
 

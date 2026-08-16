@@ -9,27 +9,12 @@ const {
   deleteInquiry,
   getInquiryStats,
 } = require('../controllers/inquiryController');
-
-// Try to load auth middleware — adjust path to match YOUR project structure
-let protect;
-try {
-  protect = require('../middleware/auth').protect;
-} catch (e) {
-  try {
-    protect = require('../middleware/authMiddleware').protect;
-  } catch (e2) {
-    try {
-      protect = require('../middlewares/auth').protect;
-    } catch (e3) {
-      console.warn('⚠️  Auth middleware not found — admin routes will be unprotected temporarily');
-      protect = (req, res, next) => next(); // fallback: no protection
-    }
-  }
-}
+const { protect } = require('../middleware/authMiddleware');
+const { validateInquiry } = require('../validators/inquiryValidator');
 
 // ── PUBLIC ──────────────────────────────────────────────────────
 // POST /api/inquiries
-router.post('/', createInquiry);
+router.post('/', validateInquiry, createInquiry);
 
 // ── ADMIN (protected) ────────────────────────────────────────────
 // NOTE: /stats MUST come before /:id to avoid Express treating "stats" as an id

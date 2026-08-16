@@ -17,29 +17,9 @@ const safeSendEmails = async (inquiry) => {
 // @desc  Create new inquiry
 // @route POST /api/inquiries
 // @access Public
-const createInquiry = async (req, res) => {
+const createInquiry = async (req, res, next) => {
   try {
-    console.log('📩 Inquiry request body:', JSON.stringify(req.body));
-
     const { name, email, phone, subject, message } = req.body;
-
-    // Manual validation — skip express-validator for now
-    const missing = [];
-    if (!name?.trim())    missing.push('name');
-    if (!email?.trim())   missing.push('email');
-    if (!phone?.trim())   missing.push('phone');
-    if (!subject?.trim()) missing.push('subject');
-    if (!message?.trim()) missing.push('message');
-
-    if (missing.length > 0) {
-      return res.status(400).json({
-        success: false,
-        error: {
-          message: `Missing required fields: ${missing.join(', ')}`,
-          statusCode: 400,
-        },
-      });
-    }
 
     // Save to MongoDB
     const inquiry = await Inquiry.create({
@@ -49,8 +29,6 @@ const createInquiry = async (req, res) => {
       subject: subject.trim(),
       message: message.trim(),
     });
-
-    console.log('✅ Inquiry saved:', inquiry._id);
 
     // Send emails in background — will NOT crash request if email fails
     safeSendEmails(inquiry);
@@ -68,69 +46,50 @@ const createInquiry = async (req, res) => {
     });
 
   } catch (error) {
-    console.error('❌ createInquiry error:', error);
-
-    // Mongoose validation error
-    if (error.name === 'ValidationError') {
-      const errors = Object.values(error.errors).map(e => ({
-        field:   e.path,
-        message: e.message,
-      }));
-      return res.status(400).json({
-        success: false,
-        error: { message: 'Validation failed', statusCode: 400, errors },
-      });
-    }
-
-    return res.status(500).json({
-      success: false,
-      error: {
-        message: 'Server error. Please try again.',
-        statusCode: 500,
-        detail: process.env.NODE_ENV === 'development' ? error.message : undefined,
-      },
-    });
+    next(error);
   }
 };
 
 // @desc  Get all inquiries
 // @route GET /api/inquiries
 // @access Private/Admin
-const getInquiries = async (req, res) => {
+const getInquiries = async (req, res, next) => {
   try {
     const { status, page = 1, limit = 20 } = req.query;
     const query = {};
     if (status) query.status = status;
 
-    const skip  = (parseInt(page) - 1) * parseInt(limit);
-    const total = await Inquiry.countDocuments(query);
-
-    const inquiries = await Inquiry.find(query)
+    const pageNum = Math.max(1, Number.parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 20));
+    const skip = (pageNum - 1) * limitNum;
+    const [total, inquiries] = await Promise.all([
+      Inquiry.countDocuments(query),
+      Inquiry.find(query)
       .sort({ createdAt: -1 })
       .skip(skip)
-      .limit(parseInt(limit));
+      .limit(limitNum),
+    ]);
 
     return res.status(200).json({
       success: true,
       count: inquiries.length,
       pagination: {
-        page:  parseInt(page),
-        limit: parseInt(limit),
+        page: pageNum,
+        limit: limitNum,
         total,
-        pages: Math.ceil(total / parseInt(limit)),
+        pages: Math.ceil(total / limitNum),
       },
       data: inquiries,
     });
   } catch (error) {
-    console.error('getInquiries error:', error);
-    return res.status(500).json({ success: false, error: { message: 'Server error', statusCode: 500 } });
+    next(error);
   }
 };
 
 // @desc  Get single inquiry
 // @route GET /api/inquiries/:id
 // @access Private/Admin
-const getInquiryById = async (req, res) => {
+const getInquiryById = async (req, res, next) => {
   try {
     const inquiry = await Inquiry.findById(req.params.id);
     if (!inquiry) {
@@ -138,14 +97,14 @@ const getInquiryById = async (req, res) => {
     }
     return res.status(200).json({ success: true, data: inquiry });
   } catch (error) {
-    return res.status(500).json({ success: false, error: { message: 'Server error', statusCode: 500 } });
+    next(error);
   }
 };
 
 // @desc  Update inquiry status
 // @route PUT /api/inquiries/:id/status
 // @access Private/Admin
-const updateInquiryStatus = async (req, res) => {
+const updateInquiryStatus = async (req, res, next) => {
   try {
     const { status } = req.body;
     if (!['unread', 'read', 'replied'].includes(status)) {
@@ -159,14 +118,14 @@ const updateInquiryStatus = async (req, res) => {
     }
     return res.status(200).json({ success: true, data: inquiry });
   } catch (error) {
-    return res.status(500).json({ success: false, error: { message: 'Server error', statusCode: 500 } });
+    next(error);
   }
 };
 
 // @desc  Delete inquiry
 // @route DELETE /api/inquiries/:id
 // @access Private/Admin
-const deleteInquiry = async (req, res) => {
+const deleteInquiry = async (req, res, next) => {
   try {
     const inquiry = await Inquiry.findByIdAndDelete(req.params.id);
     if (!inquiry) {
@@ -174,14 +133,14 @@ const deleteInquiry = async (req, res) => {
     }
     return res.status(200).json({ success: true, message: 'Inquiry deleted' });
   } catch (error) {
-    return res.status(500).json({ success: false, error: { message: 'Server error', statusCode: 500 } });
+    next(error);
   }
 };
 
 // @desc  Get stats
 // @route GET /api/inquiries/stats
 // @access Private/Admin
-const getInquiryStats = async (req, res) => {
+const getInquiryStats = async (req, res, next) => {
   try {
     const [total, unread, read, replied] = await Promise.all([
       Inquiry.countDocuments(),
@@ -191,7 +150,7 @@ const getInquiryStats = async (req, res) => {
     ]);
     return res.status(200).json({ success: true, data: { total, unread, read, replied } });
   } catch (error) {
-    return res.status(500).json({ success: false, error: { message: 'Server error', statusCode: 500 } });
+    next(error);
   }
 };
 

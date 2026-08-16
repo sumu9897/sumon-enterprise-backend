@@ -18,14 +18,16 @@ const projectValidators = {
       .withMessage('Description is required')
       .isLength({ min: 10 })
       .withMessage('Description must be at least 10 characters'),
-    body('address.area')
+    body(['address.area', 'area'])
+      .optional()
       .trim()
-      .notEmpty()
-      .withMessage('Area is required'),
-    body('address.city')
+      .isLength({ max: 120 })
+      .withMessage('Area must not exceed 120 characters'),
+    body(['address.city', 'city'])
+      .optional()
       .trim()
-      .notEmpty()
-      .withMessage('City is required'),
+      .isLength({ max: 120 })
+      .withMessage('City must not exceed 120 characters'),
     body('status')
       .isIn(['Ongoing', 'Finished'])
       .withMessage('Status must be either Ongoing or Finished'),

@@ -46,6 +46,8 @@ const inquirySchema = new mongoose.Schema(
   }
 );
 
+inquirySchema.index({ status: 1, createdAt: -1 });
+
 const Inquiry = mongoose.model('Inquiry', inquirySchema);
 
 module.exports = Inquiry;

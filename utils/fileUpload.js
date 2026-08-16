@@ -21,7 +21,9 @@ const storage = multer.diskStorage({
 
 // File filter
 const fileFilter = (req, file, cb) => {
-  const allowedTypes = process.env.ALLOWED_FILE_TYPES.split(',');
+  const allowedTypes = (process.env.ALLOWED_FILE_TYPES || 'image/jpeg,image/png,image/webp')
+    .split(',')
+    .map((type) => type.trim());
   
   if (allowedTypes.includes(file.mimetype)) {
     cb(null, true);
@@ -34,7 +36,7 @@ const fileFilter = (req, file, cb) => {
 const upload = multer({
   storage: storage,
   limits: {
-    fileSize: parseInt(process.env.MAX_FILE_SIZE) || 5242880, // 5MB default
+    fileSize: Number.parseInt(process.env.MAX_FILE_SIZE, 10) || 5242880,
   },
   fileFilter: fileFilter,
 });

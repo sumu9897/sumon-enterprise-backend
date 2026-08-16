@@ -112,6 +112,7 @@ const projectSchema = new mongoose.Schema(
     slug: {
       type: String,
       unique: true,
+      index: true,
     },
     featured: {
       type: Boolean,
@@ -132,6 +133,8 @@ projectSchema.index({
   description: "text",
   company: "text",
 });
+projectSchema.index({ status: 1, startDate: -1 });
+projectSchema.index({ featured: 1, startDate: -1 });
 
 // Generate slug before saving
 projectSchema.pre("save", function (next) {

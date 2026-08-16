@@ -2,11 +2,6 @@ const errorHandler = (err, req, res, next) => {
   let error = { ...err };
   error.message = err.message;
 
-  // Log error for dev
-  if (process.env.NODE_ENV === 'development') {
-    console.error(err);
-  }
-
   // Mongoose bad ObjectId
   if (err.name === 'CastError') {
     const message = 'Resource not found';
@@ -54,12 +49,31 @@ const errorHandler = (err, req, res, next) => {
     };
   }
 
-  res.status(error.statusCode || 500).json({
+  if (err.name === 'MulterError') {
+    error = {
+      message: err.code === 'LIMIT_FILE_SIZE'
+        ? 'An uploaded image exceeds the maximum file size'
+        : 'The uploaded files could not be processed',
+      statusCode: 400,
+    };
+  }
+
+  const statusCode = error.statusCode || 500;
+  const isServerError = statusCode >= 500;
+
+  if (isServerError && process.env.NODE_ENV !== 'test') {
+    console.error(`[${req.id || 'no-request-id'}]`, err);
+  }
+
+  res.status(statusCode).json({
     success: false,
     error: {
-      message: error.message || 'Server Error',
-      statusCode: error.statusCode || 500,
+      message: isServerError && process.env.NODE_ENV === 'production'
+        ? 'An unexpected server error occurred'
+        : (error.message || 'Server Error'),
+      statusCode,
       ...(error.errors && { errors: error.errors }),
+      ...(req.id && { requestId: req.id }),
     },
   });
 };
