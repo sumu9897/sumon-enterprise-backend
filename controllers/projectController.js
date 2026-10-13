@@ -316,7 +316,7 @@ const updateProject = async (req, res, next) => {
     if (req.body.description) updateData.description = req.body.description;
     if (req.body.status) updateData.status = req.body.status;
     if (req.body.startDate) updateData.startDate = req.body.startDate;
-    if (req.body.finishDate !== undefined) updateData.finishDate = req.body.finishDate;
+    if (req.body.finishDate !== undefined) updateData.finishDate = req.body.finishDate || null;
     if (req.body.featured !== undefined) updateData.featured = req.body.featured === 'true' || req.body.featured === true;
 
     if (req.body.projectName || req.body.company) {

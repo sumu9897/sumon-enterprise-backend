@@ -48,7 +48,7 @@ const projectValidators = {
       .isISO8601()
       .withMessage('Invalid start date format'),
     body('finishDate')
-      .optional()
+      .optional({ checkFalsy: true })
       .isISO8601()
       .withMessage('Invalid finish date format')
       .custom(finishAfterStart),
@@ -79,7 +79,7 @@ const projectValidators = {
       .isISO8601()
       .withMessage('Invalid start date format'),
     body('finishDate')
-      .optional()
+      .optional({ checkFalsy: true })
       .isISO8601()
       .withMessage('Invalid finish date format')
       .custom(finishAfterStart),
