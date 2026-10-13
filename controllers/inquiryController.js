@@ -3,7 +3,7 @@ const Inquiry = require('../models/Inquiry');
 // Safe email sender — NEVER crashes the request if email fails
 const safeSendEmails = async (inquiry) => {
   try {
-    const { sendInquiryNotification, sendInquiryConfirmation } = require('../utils/emailService');
+    const { sendInquiryNotification, sendInquiryConfirmation } = require('../utils/sendEmail');
     await Promise.allSettled([
       sendInquiryNotification(inquiry),
       sendInquiryConfirmation(inquiry),

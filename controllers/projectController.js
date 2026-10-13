@@ -17,6 +17,10 @@ const parseCoordinates = (value) => {
   return numbers;
 };
 
+const cleanupFiles = async (files = []) => {
+  await Promise.allSettled(files.map((file) => fs.unlink(file.path)));
+};
+
 // @desc    Get all projects
 // @route   GET /api/projects
 // @access  Public
@@ -221,15 +225,7 @@ const createProject = async (req, res, next) => {
     });
   } catch (error) {
     // Clean up uploaded files on error
-    if (req.files) {
-      req.files.forEach(async (file) => {
-        try {
-          await fs.unlink(file.path);
-        } catch (err) {
-          console.error('Error deleting file:', err);
-        }
-      });
-    }
+    await cleanupFiles(req.files);
     next(error);
   }
 };
@@ -361,15 +357,7 @@ const updateProject = async (req, res, next) => {
     });
   } catch (error) {
     // Clean up uploaded files on error
-    if (req.files) {
-      req.files.forEach(async (file) => {
-        try {
-          await fs.unlink(file.path);
-        } catch (err) {
-          console.error('Error deleting file:', err);
-        }
-      });
-    }
+    await cleanupFiles(req.files);
     next(error);
   }
 };
@@ -403,7 +391,7 @@ const deleteProject = async (req, res, next) => {
         } else if (image.publicId) {
           // Delete from local storage
           try {
-            await fs.unlink(path.join(__dirname, '../uploads', image.publicId));
+            await fs.unlink(path.join('/tmp', 'uploads', path.basename(image.publicId)));
           } catch (err) {
             console.error('Error deleting local file:', err);
           }

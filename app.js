@@ -5,10 +5,12 @@ const morgan = require('morgan');
 const rateLimit = require('express-rate-limit');
 const path = require('path');
 const crypto = require('crypto');
+const mongoose = require('mongoose');
 
 const authRoutes = require('./routes/authRoutes');
 const projectRoutes = require('./routes/projectRoutes');
 const inquiryRoutes = require('./routes/inquiryRoutes');
+const siteContentRoutes = require('./routes/siteContentRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -30,7 +32,8 @@ app.use((req, res, next) => {
 
 app.use(cors({
   origin(origin, callback) {
-    if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+    const isLoopbackOrigin = /^http:\/\/(localhost|127\.0\.0\.1):\d+$/.test(origin || '');
+    if (!origin || allowedOrigins.has(origin) || isLoopbackOrigin) return callback(null, true);
     const error = new Error('Origin is not allowed');
     error.statusCode = 403;
     return callback(error);
@@ -47,6 +50,28 @@ app.use(helmet({
 }));
 app.use(express.json({ limit: '1mb' }));
 app.use(express.urlencoded({ extended: false, limit: '1mb' }));
+
+const containsUnsafeKey = (value) => {
+  if (!value || typeof value !== 'object') return false;
+  return Object.entries(value).some(([key, child]) => (
+    key.startsWith('$') || key === '__proto__' || containsUnsafeKey(child)
+  ));
+};
+
+app.use((req, res, next) => {
+  if (containsUnsafeKey(req.body) || containsUnsafeKey(req.query) || containsUnsafeKey(req.params)) {
+    return res.status(400).json({
+      success: false,
+      error: { message: 'Request contains unsupported field names', statusCode: 400, requestId: req.id },
+    });
+  }
+  next();
+});
+
+app.use('/api/auth', (_req, res, next) => {
+  res.set('Cache-Control', 'no-store');
+  next();
+});
 
 if (process.env.NODE_ENV !== 'test') {
   app.use(morgan(process.env.NODE_ENV === 'production' ? 'combined' : 'dev'));
@@ -74,6 +99,14 @@ const authLimiter = rateLimit({
   message: rateLimitMessage('Too many sign-in attempts. Please wait and try again.'),
 });
 
+const recoveryLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 5,
+  standardHeaders: 'draft-7',
+  legacyHeaders: false,
+  message: rateLimitMessage('Too many recovery attempts. Please wait and try again.'),
+});
+
 const inquiryLimiter = rateLimit({
   windowMs: 60 * 60 * 1000,
   limit: 8,
@@ -84,6 +117,8 @@ const inquiryLimiter = rateLimit({
 
 app.use('/api', apiLimiter);
 app.use('/api/auth/login', authLimiter);
+app.use('/api/auth/forgot-password', recoveryLimiter);
+app.use('/api/auth/reset-password', recoveryLimiter);
 app.use('/api/inquiries', (req, res, next) => (
   req.method === 'POST' ? inquiryLimiter(req, res, next) : next()
 ));
@@ -93,16 +128,23 @@ app.use('/uploads', express.static(path.join('/tmp', 'uploads'), {
 }));
 
 app.get('/api/health', (req, res) => {
-  res.status(200).json({
-    success: true,
-    message: 'Service is healthy',
-    data: { status: 'ok', timestamp: new Date().toISOString() },
+  const databaseReady = mongoose.connection.readyState === 1;
+  res.status(databaseReady ? 200 : 503).json({
+    success: databaseReady,
+    message: databaseReady ? 'Service is healthy' : 'Service is starting',
+    data: {
+      status: databaseReady ? 'ok' : 'degraded',
+      database: databaseReady ? 'connected' : 'disconnected',
+      timestamp: new Date().toISOString(),
+      requestId: req.id,
+    },
   });
 });
 
 app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/inquiries', inquiryRoutes);
+app.use('/api/site-content', siteContentRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

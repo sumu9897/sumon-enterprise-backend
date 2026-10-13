@@ -70,7 +70,12 @@ See `.env.example` for all required environment variables:
 ## API Endpoints
 
 ### Authentication
-- `POST /api/auth/register` - Register admin
+- `POST /api/auth/register` - Create an administrator (authenticated superadmin only)
+- `POST /api/auth/forgot-password` - Request a single-use 15-minute recovery link (generic response)
+- `POST /api/auth/reset-password` - Reset a password with the emailed recovery token
+- `POST /api/auth/change-password` - Change the signed-in administrator password
+- `POST /api/auth/logout-all` - Revoke all issued sessions for the administrator
+- `GET /api/auth/me` - Read the signed-in administrator profile
 - `POST /api/auth/login` - Login admin
 - `GET /api/auth/me` - Get current admin (Protected)
 - `POST /api/auth/logout` - Logout (Protected)

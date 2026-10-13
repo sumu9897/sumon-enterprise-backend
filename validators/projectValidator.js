@@ -1,5 +1,13 @@
 const { body } = require('express-validator');
 
+const finishAfterStart = (value, { req }) => {
+  if (!value || !req.body.startDate) return true;
+  if (new Date(value) < new Date(req.body.startDate)) {
+    throw new Error('Finish date cannot be before start date');
+  }
+  return true;
+};
+
 const projectValidators = {
   createProject: [
     body('projectName')
@@ -39,7 +47,8 @@ const projectValidators = {
     body('finishDate')
       .optional()
       .isISO8601()
-      .withMessage('Invalid finish date format'),
+      .withMessage('Invalid finish date format')
+      .custom(finishAfterStart),
   ],
 
   updateProject: [
@@ -69,7 +78,8 @@ const projectValidators = {
     body('finishDate')
       .optional()
       .isISO8601()
-      .withMessage('Invalid finish date format'),
+      .withMessage('Invalid finish date format')
+      .custom(finishAfterStart),
   ],
 };
 

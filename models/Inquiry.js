@@ -20,6 +20,8 @@ const inquirySchema = new mongoose.Schema(
       type: String,
       required: [true, 'Please provide your phone number'],
       trim: true,
+      minlength: [7, 'Please provide a valid phone number'],
+      maxlength: [30, 'Phone number must not exceed 30 characters'],
     },
     subject: {
       type: String,

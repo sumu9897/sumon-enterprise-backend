@@ -380,8 +380,45 @@ const sendInquiryConfirmation = async (inquiry) => {
   });
 };
 
+const escapeHtml = (value) => String(value || '')
+  .replaceAll('&', '&amp;')
+  .replaceAll('<', '&lt;')
+  .replaceAll('>', '&gt;')
+  .replaceAll('"', '&quot;')
+  .replaceAll("'", '&#039;');
+
+const sendPasswordResetEmail = async (admin, resetUrl) => {
+  const safeName = escapeHtml(admin.name);
+  const safeUrl = escapeHtml(resetUrl);
+  const content = `
+    <tr><td style="padding:40px;">
+      <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:${GOLD};">Account recovery</p>
+      <h2 style="margin:0 0 16px;color:${DARK};font-size:24px;">Reset your administrator password</h2>
+      <p style="color:${GRAY};line-height:1.7;">Hello ${safeName}, we received a request to reset your M/S SUMON ENTERPRISE administrator password.</p>
+      <table cellpadding="0" cellspacing="0" style="margin:28px 0;"><tr><td style="background:${GOLD};border-radius:3px;">
+        <a href="${safeUrl}" style="display:inline-block;padding:14px 26px;color:${DARK};font-weight:700;text-decoration:none;">Reset password</a>
+      </td></tr></table>
+      <p style="color:${GRAY};font-size:13px;line-height:1.7;">This secure link expires in 15 minutes and can be used only once. If you did not request this change, ignore this email and review your account activity.</p>
+      <p style="color:${GRAY};font-size:11px;word-break:break-all;">If the button does not work, open: ${safeUrl}</p>
+    </td></tr>`;
+  return sendEmail({ to: admin.email, subject: 'Reset your M/S SUMON ENTERPRISE administrator password', html: baseWrapper(content) });
+};
+
+const sendPasswordChangedEmail = async (admin) => {
+  const content = `
+    <tr><td style="padding:40px;">
+      <p style="margin:0 0 8px;font-size:11px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:${GOLD};">Security notice</p>
+      <h2 style="margin:0 0 16px;color:${DARK};font-size:24px;">Your password was changed</h2>
+      <p style="color:${GRAY};line-height:1.7;">Hello ${escapeHtml(admin.name)}, your administrator password was changed successfully. All previously issued sessions have been invalidated.</p>
+      <p style="color:${GRAY};line-height:1.7;">If you did not make this change, contact ${escapeHtml(process.env.CONTACT_EMAIL || process.env.EMAIL_FROM)} immediately.</p>
+    </td></tr>`;
+  return sendEmail({ to: admin.email, subject: 'Administrator password changed — M/S SUMON ENTERPRISE', html: baseWrapper(content) });
+};
+
 module.exports = {
   sendEmail,
   sendInquiryNotification,
   sendInquiryConfirmation,
+  sendPasswordResetEmail,
+  sendPasswordChangedEmail,
 };

@@ -37,6 +37,15 @@ const adminSchema = new mongoose.Schema(
     lastLogin: {
       type: Date,
     },
+    passwordChangedAt: Date,
+    passwordResetTokenHash: { type: String, select: false },
+    passwordResetExpiresAt: { type: Date, select: false },
+    passwordResetUsedAt: { type: Date, select: false },
+    tokenVersion: {
+      type: Number,
+      default: 0,
+      select: false,
+    },
   },
   {
     timestamps: true,
@@ -58,6 +67,8 @@ adminSchema.pre('save', async function (next) {
 adminSchema.methods.comparePassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
+
+adminSchema.index({ passwordResetTokenHash: 1 }, { sparse: true });
 
 const Admin = mongoose.model('Admin', adminSchema);
 

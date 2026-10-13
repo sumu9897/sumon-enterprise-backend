@@ -14,7 +14,7 @@ const protect = async (req, res, next) => {
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
       // Get admin from token
-      req.admin = await Admin.findById(decoded.id).select('-password');
+      req.admin = await Admin.findById(decoded.id).select('+tokenVersion');
 
       if (!req.admin) {
         return res.status(401).json({
@@ -33,6 +33,13 @@ const protect = async (req, res, next) => {
             message: 'Account is inactive',
             statusCode: 401,
           },
+        });
+      }
+
+      if ((decoded.version || 0) !== (req.admin.tokenVersion || 0)) {
+        return res.status(401).json({
+          success: false,
+          error: { message: 'Session has expired. Please sign in again.', statusCode: 401 },
         });
       }
 
