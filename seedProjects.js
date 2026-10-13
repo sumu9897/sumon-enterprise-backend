@@ -137,7 +137,7 @@ const projectsData = [
       area: "Darmosagor Par", 
       city: "Comilla" 
     },
-    status: "Finished", 
+    status: "Completed",
     startDate: new Date("2010-01-01"),
     finishDate: new Date("2013-12-31"),
     images: []
@@ -155,7 +155,7 @@ const projectsData = [
       area: "Darmosagor Par", 
       city: "Comilla" 
     },
-    status: "Finished", 
+    status: "Completed",
     startDate: new Date("2023-01-01"),
     finishDate: new Date("2026-01-01"),
     images: []
@@ -174,7 +174,7 @@ const projectsData = [
       area: "Masdair, Fatulla", 
       city: "Narayanganj" 
     },
-    status: "Finished", 
+    status: "Completed",
     startDate: new Date("2022-01-01"),
     finishDate: new Date("2025-01-01"),
     images: []
@@ -235,7 +235,7 @@ const projectsData = [
       area: "Bashundhara R/A", 
       city: "Dhaka" 
     },
-    status: "Finished", 
+    status: "Completed",
     startDate: new Date("2024-01-01"),
     finishDate: new Date("2024-12-31"),
     images: []
@@ -253,7 +253,7 @@ const projectsData = [
       area: "Ashulia, Savar", 
       city: "Dhaka" 
     },
-    status: "Finished", 
+    status: "Completed",
     startDate: new Date("2020-01-01"),
     finishDate: new Date("2022-12-31"),
     images: []
@@ -270,7 +270,7 @@ const projectsData = [
       area: "Nawnadigir Par", 
       city: "Comilla" 
     },
-    status: "Finished", 
+    status: "Completed",
     startDate: new Date("2017-01-01"),
     finishDate: new Date("2020-12-31"),
     images: []
@@ -287,7 +287,7 @@ const projectsData = [
       area: "Talpukur Par", 
       city: "Comilla" 
     },
-    status: "Finished", 
+    status: "Completed",
     startDate: new Date("2016-01-01"),
     finishDate: new Date("2022-12-31"),
     images: []
@@ -351,7 +351,7 @@ const seedDatabase = async () => {
     console.log(`✅ Successfully inserted ${inserted.length} projects!`);
     console.log('\nProject Summary:');
     console.log(`- Ongoing: ${inserted.filter(p => p.status === 'Ongoing').length}`);
-    console.log(`- Finished: ${inserted.filter(p => p.status === 'Finished').length}`);
+    console.log(`- Completed: ${inserted.filter(p => p.status === 'Completed').length}`);
     console.log(`- Featured: ${inserted.filter(p => p.featured).length}`);
     console.log(`- With Images: ${inserted.filter(p => p.images.length > 0).length}`);
 

@@ -1,4 +1,7 @@
 const { body } = require('express-validator');
+const { PROJECT_STATUSES } = require('../constants/projectStatuses');
+
+const statusMessage = `Status must be one of: ${PROJECT_STATUSES.join(', ')}`;
 
 const finishAfterStart = (value, { req }) => {
   if (!value || !req.body.startDate) return true;
@@ -37,8 +40,8 @@ const projectValidators = {
       .isLength({ max: 120 })
       .withMessage('City must not exceed 120 characters'),
     body('status')
-      .isIn(['Ongoing', 'Finished'])
-      .withMessage('Status must be either Ongoing or Finished'),
+      .isIn(PROJECT_STATUSES)
+      .withMessage(statusMessage),
     body('startDate')
       .notEmpty()
       .withMessage('Start date is required')
@@ -69,8 +72,8 @@ const projectValidators = {
       .withMessage('Description must be at least 10 characters'),
     body('status')
       .optional()
-      .isIn(['Ongoing', 'Finished'])
-      .withMessage('Status must be either Ongoing or Finished'),
+      .isIn(PROJECT_STATUSES)
+      .withMessage(statusMessage),
     body('startDate')
       .optional()
       .isISO8601()

@@ -3,6 +3,7 @@ const cloudinary = require('../config/cloudinary');
 const fs = require('fs').promises;
 const path = require('path');
 const slugify = require('slugify');
+const { PROJECT_STATUSES } = require('../constants/projectStatuses');
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const SORT_OPTIONS = new Set(['startDate', '-startDate', 'projectName', '-projectName', 'createdAt', '-createdAt']);
@@ -53,6 +54,12 @@ const getProjects = async (req, res, next) => {
     const query = {};
 
     if (status) {
+      if (!PROJECT_STATUSES.includes(status)) {
+        return res.status(400).json({
+          success: false,
+          error: { message: 'Invalid project status filter', statusCode: 400 },
+        });
+      }
       query.status = status;
     }
 

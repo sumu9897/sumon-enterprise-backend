@@ -1,5 +1,6 @@
 const mongoose = require("mongoose");
 const slugify = require("slugify");
+const { PROJECT_STATUSES } = require('../constants/projectStatuses');
 
 const projectSchema = new mongoose.Schema(
   {
@@ -55,7 +56,7 @@ const projectSchema = new mongoose.Schema(
     },
     status: {
       type: String,
-      enum: ["Ongoing", "Finished"],
+      enum: PROJECT_STATUSES,
       required: [true, "Please provide project status"],
     },
     startDate: {

@@ -7,6 +7,7 @@
     "start": "node server.js",
     "dev": "nodemon server.js",
     "seed:primary-admin": "node scripts/seed-primary-admin.js",
+    "migrate:project-statuses": "node scripts/migrate-project-statuses.js",
     "migrate:primary-admin": "node scripts/promote-primary-admin.js",
     "test": "node --test test/*.test.js"
   },
