@@ -8,6 +8,7 @@ const {
   createProject,
   updateProject,
   deleteProject,
+  getProjectUploadSignature,
 } = require('../controllers/projectController');
 const { protect } = require('../middleware/authMiddleware');
 const upload = require('../utils/fileUpload');
@@ -19,6 +20,7 @@ router.get('/featured', getFeaturedProjects);
 router.get('/slug/:slug', getProjectBySlug);
 router.get('/:id', getProjectById);
 // Protected routes (Admin only)
+router.post('/images/signature', protect, getProjectUploadSignature);
 router.post(
   '/',
   protect,

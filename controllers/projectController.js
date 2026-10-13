@@ -7,6 +7,27 @@ const slugify = require('slugify');
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const SORT_OPTIONS = new Set(['startDate', '-startDate', 'projectName', '-projectName', 'createdAt', '-createdAt']);
 
+const parseUploadedImages = (value) => {
+  if (!value) return [];
+  let images = value;
+  if (typeof value === 'string') {
+    try { images = JSON.parse(value); } catch {
+      throw Object.assign(new Error('Uploaded image information is invalid'), { statusCode: 400 });
+    }
+  }
+  if (!Array.isArray(images) || images.length > 10) {
+    throw Object.assign(new Error('A maximum of 10 project images is allowed'), { statusCode: 400 });
+  }
+  return images.map((image, index) => {
+    const url = String(image?.url || '');
+    const publicId = String(image?.publicId || '');
+    if (!url.startsWith('https://res.cloudinary.com/') || !publicId.startsWith('sumon-enterprise/projects/')) {
+      throw Object.assign(new Error('Uploaded image information is invalid'), { statusCode: 400 });
+    }
+    return { url, publicId, isPrimary: index === 0 };
+  });
+};
+
 const parseCoordinates = (value) => {
   const coordinates = Array.isArray(value) ? value : JSON.parse(value);
   if (coordinates.length !== 2) throw Object.assign(new Error('Coordinates must contain longitude and latitude'), { statusCode: 400 });
@@ -141,6 +162,36 @@ const getFeaturedProjects = async (req, res, next) => {
   }
 };
 
+// @desc    Create short-lived parameters for direct Cloudinary image upload
+// @route   POST /api/projects/images/signature
+// @access  Private
+const getProjectUploadSignature = async (_req, res, next) => {
+  try {
+    if (process.env.USE_CLOUDINARY !== 'true') {
+      return res.status(503).json({
+        success: false,
+        error: { message: 'Cloud image storage is not configured', statusCode: 503 },
+      });
+    }
+    const timestamp = Math.floor(Date.now() / 1000);
+    const folder = 'sumon-enterprise/projects';
+    const signature = cloudinary.utils.api_sign_request(
+      { folder, timestamp },
+      process.env.CLOUDINARY_API_SECRET,
+    );
+    return res.json({
+      success: true,
+      data: {
+        timestamp,
+        folder,
+        signature,
+        cloudName: process.env.CLOUDINARY_CLOUD_NAME,
+        apiKey: process.env.CLOUDINARY_API_KEY,
+      },
+    });
+  } catch (error) { return next(error); }
+};
+
 // @desc    Create new project
 // @route   POST /api/projects
 // @access  Private
@@ -215,6 +266,9 @@ const createProject = async (req, res, next) => {
 
       projectData.images = images;
     }
+
+    const directlyUploadedImages = parseUploadedImages(req.body.uploadedImages);
+    if (directlyUploadedImages.length) projectData.images = directlyUploadedImages;
 
     const project = await Project.create(projectData);
 
@@ -345,6 +399,17 @@ const updateProject = async (req, res, next) => {
       updateData.images = [...project.images, ...newImages];
     }
 
+    const directlyUploadedImages = parseUploadedImages(req.body.uploadedImages);
+    if (directlyUploadedImages.length) {
+      updateData.images = [
+        ...project.images,
+        ...directlyUploadedImages.map((image, index) => ({
+          ...image,
+          isPrimary: project.images.length === 0 && index === 0,
+        })),
+      ];
+    }
+
     project = await Project.findByIdAndUpdate(req.params.id, updateData, {
       new: true,
       runValidators: true,
@@ -418,4 +483,5 @@ module.exports = {
   createProject,
   updateProject,
   deleteProject,
+  getProjectUploadSignature,
 };

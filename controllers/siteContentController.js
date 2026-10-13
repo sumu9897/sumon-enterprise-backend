@@ -1,5 +1,7 @@
 const SiteContent = require('../models/SiteContent');
 const Project = require('../models/Project');
+const cloudinary = require('../config/cloudinary');
+const fs = require('fs').promises;
 
 const populateContent = (query) => query.populate('gallery.project', 'projectName slug status company address images');
 
@@ -21,6 +23,7 @@ const getSiteContent = async (_req, res, next) => {
 const getAdminSiteContent = async (_req, res, next) => {
   try {
     const content = await readContent();
+    res.set('Cache-Control', 'no-store');
     return res.json({ success: true, data: content });
   } catch (error) { return next(error); }
 };
@@ -46,4 +49,39 @@ const updateSiteContent = async (req, res, next) => {
   } catch (error) { return next(error); }
 };
 
-module.exports = { getSiteContent, getAdminSiteContent, updateSiteContent };
+const uploadSiteImage = async (req, res, next) => {
+  if (!req.file) {
+    return res.status(400).json({
+      success: false,
+      error: { message: 'Please select an image to upload', statusCode: 400 },
+    });
+  }
+
+  try {
+    if (process.env.USE_CLOUDINARY !== 'true') {
+      await fs.unlink(req.file.path).catch(() => {});
+      return res.status(503).json({
+        success: false,
+        error: { message: 'Cloud image storage is not configured', statusCode: 503 },
+      });
+    }
+
+    const result = await cloudinary.uploader.upload(req.file.path, {
+      folder: 'sumon-enterprise/site-content',
+      resource_type: 'image',
+      transformation: [{ quality: 'auto', fetch_format: 'auto' }],
+    });
+    await fs.unlink(req.file.path).catch(() => {});
+
+    return res.status(201).json({
+      success: true,
+      message: 'Image uploaded successfully',
+      data: { url: result.secure_url, publicId: result.public_id },
+    });
+  } catch (error) {
+    await fs.unlink(req.file.path).catch(() => {});
+    return next(error);
+  }
+};
+
+module.exports = { getSiteContent, getAdminSiteContent, updateSiteContent, uploadSiteImage };
