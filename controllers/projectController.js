@@ -82,6 +82,7 @@ const getProjects = async (req, res, next) => {
       Project.countDocuments(query),
     ]);
 
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400');
     res.json({
       success: true,
       count: projects.length,
@@ -155,10 +156,19 @@ const getProjectBySlug = async (req, res, next) => {
 // @access  Public
 const getFeaturedProjects = async (req, res, next) => {
   try {
-    const projects = await Project.find({ featured: true })
+    let projects = await Project.find({ featured: true })
       .sort('-startDate')
-      .limit(4);
+      .limit(6)
+      .lean();
 
+    if (projects.length === 0) {
+      projects = await Project.find({})
+        .sort('-startDate')
+        .limit(6)
+        .lean();
+    }
+
+    res.set('Cache-Control', 'public, max-age=60, s-maxage=300, stale-while-revalidate=86400');
     res.json({
       success: true,
       count: projects.length,
