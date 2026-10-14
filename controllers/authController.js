@@ -3,20 +3,75 @@ const Admin = require('../models/Admin');
 const generateToken = require('../utils/generateToken');
 const writeAuditLog = require('../utils/audit');
 const { sendPasswordResetEmail, sendPasswordChangedEmail } = require('../utils/sendEmail');
+const { normalizePermissions } = require('../constants/adminPermissions');
 
 const PRIMARY_ADMIN_EMAIL = (process.env.PRIMARY_ADMIN_EMAIL || 'sumonconstruction2024@gmail.com').toLowerCase();
 const RESET_TTL_MS = 15 * 60 * 1000;
 const GENERIC_RESET_MESSAGE = 'If an active administrator account matches that email, a recovery link has been sent.';
 const normalizeEmail = (email = '') => String(email).trim().toLowerCase();
-const publicAdmin = (admin) => ({ _id: admin._id, name: admin.name, email: admin.email, role: admin.role, lastLogin: admin.lastLogin });
+const publicAdmin = (admin) => ({
+  _id: admin._id,
+  name: admin.name,
+  email: admin.email,
+  role: admin.role,
+  permissions: admin.role === 'superadmin' ? ['*'] : (admin.permissions || []),
+  isActive: admin.isActive,
+  lastLogin: admin.lastLogin,
+  createdAt: admin.createdAt,
+});
 
 const register = async (req, res, next) => {
   try {
     const email = normalizeEmail(req.body.email);
     if (await Admin.exists({ email })) return res.status(409).json({ success: false, error: { message: 'Administrator already exists', statusCode: 409 } });
-    const admin = await Admin.create({ name: req.body.name.trim(), email, password: req.body.password, role: 'admin' });
+    const admin = await Admin.create({
+      name: req.body.name.trim(),
+      email,
+      password: req.body.password,
+      role: 'admin',
+      permissions: normalizePermissions(req.body.permissions),
+    });
     await writeAuditLog(req, 'admin.created', 'success', admin);
     return res.status(201).json({ success: true, message: 'Administrator created', data: { admin: publicAdmin(admin) } });
+  } catch (error) { return next(error); }
+};
+
+const listAdmins = async (_req, res, next) => {
+  try {
+    const admins = await Admin.find({}).sort({ role: -1, createdAt: 1 });
+    return res.json({ success: true, data: admins.map(publicAdmin) });
+  } catch (error) { return next(error); }
+};
+
+const updateAdminAccess = async (req, res, next) => {
+  try {
+    const admin = await Admin.findById(req.params.id).select('+tokenVersion');
+    if (!admin) return res.status(404).json({ success: false, error: { message: 'Administrator not found', statusCode: 404 } });
+    if (admin.role === 'superadmin') return res.status(403).json({ success: false, error: { message: 'The primary administrator access cannot be changed here', statusCode: 403 } });
+
+    if (req.body.name !== undefined) admin.name = String(req.body.name).trim();
+    if (req.body.permissions !== undefined) admin.permissions = normalizePermissions(req.body.permissions);
+    if (req.body.isActive !== undefined) admin.isActive = req.body.isActive === true;
+    admin.tokenVersion = (admin.tokenVersion || 0) + 1;
+    await admin.save();
+    await writeAuditLog(req, 'admin.access_updated', 'success', admin, {
+      permissions: admin.permissions,
+      isActive: admin.isActive,
+    });
+    return res.json({ success: true, message: 'Administrator access updated', data: publicAdmin(admin) });
+  } catch (error) { return next(error); }
+};
+
+const deleteAdmin = async (req, res, next) => {
+  try {
+    const admin = await Admin.findById(req.params.id);
+    if (!admin) return res.status(404).json({ success: false, error: { message: 'Administrator not found', statusCode: 404 } });
+    if (admin.role === 'superadmin' || String(admin._id) === String(req.admin._id)) {
+      return res.status(403).json({ success: false, error: { message: 'This administrator cannot be deleted', statusCode: 403 } });
+    }
+    await writeAuditLog(req, 'admin.deleted', 'success', admin);
+    await admin.deleteOne();
+    return res.json({ success: true, message: 'Administrator deleted' });
   } catch (error) { return next(error); }
 };
 
@@ -121,4 +176,4 @@ const promotePrimaryAdmin = async (req, res, next) => {
   } catch (error) { return next(error); }
 };
 
-module.exports = { register, login, forgotPassword, resetPassword, changePassword, getMe, logout, logoutAll, promotePrimaryAdmin };
+module.exports = { register, login, forgotPassword, resetPassword, changePassword, getMe, logout, logoutAll, promotePrimaryAdmin, listAdmins, updateAdminAccess, deleteAdmin };

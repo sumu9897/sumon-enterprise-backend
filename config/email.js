@@ -1,10 +1,12 @@
 const nodemailer = require('nodemailer');
 
+const emailPort = Number.parseInt(process.env.EMAIL_PORT, 10) || 587;
+
 // Create reusable transporter
 const transporter = nodemailer.createTransport({
   host: process.env.EMAIL_HOST,
-  port: process.env.EMAIL_PORT,
-  secure: false, // true for 465, false for other ports
+  port: emailPort,
+  secure: emailPort === 465,
   auth: {
     user: process.env.EMAIL_USER,
     pass: process.env.EMAIL_PASS,
@@ -12,9 +14,9 @@ const transporter = nodemailer.createTransport({
 });
 
 // Verify connection configuration
-transporter.verify((error, success) => {
+transporter.verify((error) => {
   if (error) {
-    console.log('Email configuration error:', error);
+    console.error('Email configuration error:', error.message);
   } else {
     console.log('Email server is ready to send messages');
   }

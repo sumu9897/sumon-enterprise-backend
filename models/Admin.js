@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const { ADMIN_PERMISSIONS } = require('../constants/adminPermissions');
 
 const adminSchema = new mongoose.Schema(
   {
@@ -30,6 +31,10 @@ const adminSchema = new mongoose.Schema(
       enum: ['admin', 'superadmin'],
       default: 'admin',
     },
+    permissions: [{
+      type: String,
+      enum: ADMIN_PERMISSIONS,
+    }],
     isActive: {
       type: Boolean,
       default: true,

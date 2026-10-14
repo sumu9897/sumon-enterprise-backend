@@ -130,7 +130,7 @@ const infoRow = (label, value) => `
 const sendEmail = async (options) => {
   try {
     const mailOptions = {
-      from: `"M/S SUMON ENTERPRISE" <${process.env.EMAIL_FROM}>`,
+      from: process.env.EMAIL_FROM || `"M/S SUMON ENTERPRISE" <${process.env.EMAIL_USER}>`,
       to: options.to,
       subject: options.subject,
       html: options.html,

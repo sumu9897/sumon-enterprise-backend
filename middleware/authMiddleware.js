@@ -1,6 +1,18 @@
 const jwt = require('jsonwebtoken');
 const Admin = require('../models/Admin');
 
+const hasPermission = (admin, permission) => (
+  admin?.role === 'superadmin' || admin?.permissions?.includes(permission)
+);
+
+const authorize = (...permissions) => (req, res, next) => {
+  if (permissions.some((permission) => hasPermission(req.admin, permission))) return next();
+  return res.status(403).json({
+    success: false,
+    error: { message: 'You do not have permission to perform this action', statusCode: 403 },
+  });
+};
+
 const protect = async (req, res, next) => {
   let token;
 
@@ -67,4 +79,4 @@ const protect = async (req, res, next) => {
   }
 };
 
-module.exports = { protect };
+module.exports = { protect, authorize, hasPermission };

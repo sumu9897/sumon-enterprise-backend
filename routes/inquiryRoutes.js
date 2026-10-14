@@ -9,7 +9,7 @@ const {
   deleteInquiry,
   getInquiryStats,
 } = require('../controllers/inquiryController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, authorize } = require('../middleware/authMiddleware');
 const { validateInquiry } = require('../validators/inquiryValidator');
 
 // ── PUBLIC ──────────────────────────────────────────────────────
@@ -18,10 +18,10 @@ router.post('/', validateInquiry, createInquiry);
 
 // ── ADMIN (protected) ────────────────────────────────────────────
 // NOTE: /stats MUST come before /:id to avoid Express treating "stats" as an id
-router.get('/stats',       protect, getInquiryStats);
-router.get('/',            protect, getInquiries);
-router.get('/:id',         protect, getInquiryById);
-router.put('/:id/status',  protect, updateInquiryStatus);
-router.delete('/:id',      protect, deleteInquiry);
+router.get('/stats',       protect, authorize('inquiries.view'), getInquiryStats);
+router.get('/',            protect, authorize('inquiries.view'), getInquiries);
+router.get('/:id',         protect, authorize('inquiries.view'), getInquiryById);
+router.put('/:id/status',  protect, authorize('inquiries.update'), updateInquiryStatus);
+router.delete('/:id',      protect, authorize('inquiries.delete'), deleteInquiry);
 
 module.exports = router;
