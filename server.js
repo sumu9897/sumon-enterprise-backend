@@ -1,23 +1,15 @@
 // !! dotenv MUST be the very first line — before any other require !!
 require('dotenv').config();
 
-const mongoose = require('mongoose');
 const app      = require('./app');
+const connectDB = require('./config/database');
 
 const PORT = process.env.PORT || 5000;
 
 // ── Connect to MongoDB then start ────────────────────────────────
 const startServer = async () => {
   try {
-    if (!process.env.MONGODB_URI) {
-      throw new Error('MONGODB_URI environment variable is not set!');
-    }
-
-    await mongoose.connect(process.env.MONGODB_URI, {
-      serverSelectionTimeoutMS: 10000,
-    });
-
-    console.log('✅ MongoDB Connected');
+    await connectDB();
 
     app.listen(PORT, () => {
       console.log(`✅ Server running on port ${PORT}`);
@@ -30,7 +22,10 @@ const startServer = async () => {
   }
 };
 
-startServer();
+// Vercel owns the HTTP listener. Local/VM deployments still start normally.
+if (!process.env.VERCEL) {
+  startServer();
+}
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (err) => {

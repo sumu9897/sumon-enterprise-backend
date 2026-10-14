@@ -6,6 +6,7 @@ const rateLimit = require('express-rate-limit');
 const path = require('path');
 const crypto = require('crypto');
 const mongoose = require('mongoose');
+const connectDB = require('./config/database');
 
 const authRoutes = require('./routes/authRoutes');
 const projectRoutes = require('./routes/projectRoutes');
@@ -66,6 +67,19 @@ app.use((req, res, next) => {
     });
   }
   next();
+});
+
+// Vercel can invoke the Express app before a cold-start database connection
+// finishes. Gate API handlers on one shared connection promise so Mongoose
+// never buffers queries until they time out.
+app.use('/api', async (req, _res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    error.statusCode = 503;
+    next(error);
+  }
 });
 
 app.use('/api/auth', (_req, res, next) => {
