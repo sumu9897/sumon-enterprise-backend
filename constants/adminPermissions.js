@@ -20,4 +20,10 @@ const normalizePermissions = (permissions) => (
     : []
 );
 
-module.exports = { ADMIN_PERMISSIONS, normalizePermissions };
+const ROLE_PERMISSION_PRESETS = Object.freeze({
+  viewer: ['projects.view', 'inquiries.view'],
+  editor: ['projects.view', 'projects.create', 'projects.update', 'projects.status', 'inquiries.view', 'inquiries.update', 'content.update'],
+  admin: ADMIN_PERMISSIONS.filter((permission) => permission !== 'users.manage'),
+});
+
+module.exports = { ADMIN_PERMISSIONS, normalizePermissions, ROLE_PERMISSION_PRESETS };

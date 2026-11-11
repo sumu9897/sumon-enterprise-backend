@@ -4,7 +4,7 @@ const AuditLog = require('../models/AuditLog');
 const generateToken = require('../utils/generateToken');
 const writeAuditLog = require('../utils/audit');
 const { sendPasswordResetEmail, sendPasswordChangedEmail } = require('../utils/sendEmail');
-const { normalizePermissions } = require('../constants/adminPermissions');
+const { normalizePermissions, ROLE_PERMISSION_PRESETS } = require('../constants/adminPermissions');
 const { setSessionCookie, clearSessionCookie, createCsrfToken } = require('../utils/session');
 
 const PRIMARY_ADMIN_EMAIL = (process.env.PRIMARY_ADMIN_EMAIL || 'sumonconstruction2024@gmail.com').toLowerCase();
@@ -30,8 +30,8 @@ const register = async (req, res, next) => {
       name: req.body.name.trim(),
       email,
       password: req.body.password,
-      role: 'admin',
-      permissions: normalizePermissions(req.body.permissions),
+      role: ['viewer', 'editor', 'admin'].includes(req.body.role) ? req.body.role : 'editor',
+      permissions: normalizePermissions(req.body.permissions?.length ? req.body.permissions : ROLE_PERMISSION_PRESETS[req.body.role || 'editor']),
     });
     await writeAuditLog(req, 'admin.created', 'success', admin);
     return res.status(201).json({ success: true, message: 'Administrator created', data: { admin: publicAdmin(admin) } });
@@ -59,11 +59,13 @@ const updateAdminAccess = async (req, res, next) => {
 
     if (req.body.name !== undefined) admin.name = String(req.body.name).trim();
     if (req.body.permissions !== undefined) admin.permissions = normalizePermissions(req.body.permissions);
+    if (req.body.role !== undefined && ['viewer', 'editor', 'admin'].includes(req.body.role)) admin.role = req.body.role;
     if (req.body.isActive !== undefined) admin.isActive = req.body.isActive === true;
     admin.tokenVersion = (admin.tokenVersion || 0) + 1;
     await admin.save();
     await writeAuditLog(req, 'admin.access_updated', 'success', admin, {
       permissions: admin.permissions,
+      role: admin.role,
       isActive: admin.isActive,
     });
     return res.json({ success: true, message: 'Administrator access updated', data: publicAdmin(admin) });
