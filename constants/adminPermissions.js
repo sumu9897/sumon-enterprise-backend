@@ -4,10 +4,13 @@ const ADMIN_PERMISSIONS = Object.freeze([
   'projects.update',
   'projects.status',
   'projects.delete',
+  'projects.publish',
   'inquiries.view',
   'inquiries.update',
   'inquiries.delete',
   'content.update',
+  'content.publish',
+  'audit.view',
   'users.manage',
 ]);
 

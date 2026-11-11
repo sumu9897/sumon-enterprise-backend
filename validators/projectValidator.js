@@ -52,6 +52,9 @@ const projectValidators = {
       .isISO8601()
       .withMessage('Invalid finish date format')
       .custom(finishAfterStart),
+    body('publishStatus').optional().isIn(['draft', 'published', 'archived']),
+    body('category').optional().trim().isLength({ max: 120 }),
+    body('scope').optional().trim().isLength({ max: 2000 }),
   ],
 
   updateProject: [
@@ -83,6 +86,9 @@ const projectValidators = {
       .isISO8601()
       .withMessage('Invalid finish date format')
       .custom(finishAfterStart),
+    body('publishStatus').optional().isIn(['draft', 'published', 'archived']),
+    body('category').optional().trim().isLength({ max: 120 }),
+    body('scope').optional().trim().isLength({ max: 2000 }),
   ],
 };
 

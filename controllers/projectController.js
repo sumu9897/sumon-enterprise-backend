@@ -4,9 +4,17 @@ const fs = require('fs').promises;
 const path = require('path');
 const slugify = require('slugify');
 const { PROJECT_STATUSES } = require('../constants/projectStatuses');
+const writeAuditLog = require('../utils/audit');
 
 const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 const SORT_OPTIONS = new Set(['startDate', '-startDate', 'projectName', '-projectName', 'createdAt', '-createdAt']);
+const PUBLIC_VISIBILITY = { $or: [{ publishStatus: 'published' }, { publishStatus: { $exists: false } }] };
+const parseStringArray = (value) => {
+  if (!value) return [];
+  const parsed = typeof value === 'string' ? (() => { try { return JSON.parse(value); } catch { return value.split('\n'); } })() : value;
+  if (!Array.isArray(parsed)) throw Object.assign(new Error('Highlights must be a list'), { statusCode: 400 });
+  return parsed.map((item) => String(item).trim()).filter(Boolean).slice(0, 20);
+};
 
 const parseUploadedImages = (value) => {
   if (!value) return [];
@@ -51,7 +59,7 @@ const getProjects = async (req, res, next) => {
     const { status, company, search, page = 1, limit = 10, sort = '-startDate' } = req.query;
 
     // Build query
-    const query = {};
+    const query = { ...PUBLIC_VISIBILITY };
 
     if (status) {
       if (!PROJECT_STATUSES.includes(status)) {
@@ -99,12 +107,50 @@ const getProjects = async (req, res, next) => {
   }
 };
 
+// Admin list keeps drafts and archives visible and returns server-side pagination.
+const getAdminProjects = async (req, res, next) => {
+  try {
+    const { status, publishStatus, category, search, page = 1, limit = 25, sort = '-createdAt' } = req.query;
+    const query = {};
+    if (status && PROJECT_STATUSES.includes(status)) query.status = status;
+    if (publishStatus && ['draft', 'published', 'archived'].includes(publishStatus)) query.publishStatus = publishStatus;
+    if (category) query.category = new RegExp(escapeRegex(String(category).slice(0, 120)), 'i');
+    if (search) query.$text = { $search: String(search).slice(0, 100) };
+    const pageNum = Math.max(1, Number.parseInt(page, 10) || 1);
+    const limitNum = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 25));
+    const [projects, total] = await Promise.all([
+      Project.find(query).sort(SORT_OPTIONS.has(sort) ? sort : '-createdAt').skip((pageNum - 1) * limitNum).limit(limitNum),
+      Project.countDocuments(query),
+    ]);
+    return res.json({ success: true, count: projects.length, pagination: { page: pageNum, limit: limitNum, total, pages: Math.ceil(total / limitNum) }, data: projects });
+  } catch (error) { return next(error); }
+};
+
+const getProjectSummary = async (_req, res, next) => {
+  try {
+    const [total, featured, publication, statuses] = await Promise.all([
+      Project.countDocuments({ publishStatus: { $ne: 'archived' } }),
+      Project.countDocuments({ featured: true, publishStatus: { $ne: 'archived' } }),
+      Project.aggregate([{ $group: { _id: { $ifNull: ['$publishStatus', 'published'] }, count: { $sum: 1 } } }]),
+      Project.aggregate([{ $match: { publishStatus: { $ne: 'archived' } } }, { $group: { _id: '$status', count: { $sum: 1 } } }, { $sort: { count: -1 } }]),
+    ]);
+    return res.json({ success: true, data: { total, featured, publication, statuses } });
+  } catch (error) { return next(error); }
+};
+
+const getAdminProjectById = async (req, res, next) => {
+  try {
+    const project = await Project.findById(req.params.id);
+    return project ? res.json({ success: true, data: project }) : res.status(404).json({ success: false, error: { message: 'Project not found', statusCode: 404 } });
+  } catch (error) { return next(error); }
+};
+
 // @desc    Get single project by ID
 // @route   GET /api/projects/:id
 // @access  Public
 const getProjectById = async (req, res, next) => {
   try {
-    const project = await Project.findById(req.params.id);
+    const project = await Project.findOne({ _id: req.params.id, ...PUBLIC_VISIBILITY });
 
     if (!project) {
       return res.status(404).json({
@@ -130,7 +176,7 @@ const getProjectById = async (req, res, next) => {
 // @access  Public
 const getProjectBySlug = async (req, res, next) => {
   try {
-    const project = await Project.findOne({ slug: req.params.slug });
+    const project = await Project.findOne({ slug: req.params.slug, ...PUBLIC_VISIBILITY });
 
     if (!project) {
       return res.status(404).json({
@@ -156,13 +202,13 @@ const getProjectBySlug = async (req, res, next) => {
 // @access  Public
 const getFeaturedProjects = async (req, res, next) => {
   try {
-    let projects = await Project.find({ featured: true })
+    let projects = await Project.find({ featured: true, ...PUBLIC_VISIBILITY })
       .sort('-startDate')
       .limit(6)
       .lean();
 
     if (projects.length === 0) {
-      projects = await Project.find({})
+      projects = await Project.find(PUBLIC_VISIBILITY)
         .sort('-startDate')
         .limit(6)
         .lean();
@@ -235,6 +281,12 @@ const createProject = async (req, res, next) => {
         constructionType: req.body['specifications.constructionType'] || req.body.constructionType,
       },
       featured: req.body.featured === 'true' || req.body.featured === true,
+      category: req.body.category || 'General Construction',
+      scope: req.body.scope || '',
+      publishStatus: req.body.publishStatus || 'published',
+      highlights: parseStringArray(req.body.highlights),
+      seo: { title: req.body.seoTitle || '', description: req.body.seoDescription || '' },
+      order: Number(req.body.order) || 0,
     };
 
     // Handle location coordinates
@@ -288,6 +340,7 @@ const createProject = async (req, res, next) => {
     if (directlyUploadedImages.length) projectData.images = directlyUploadedImages;
 
     const project = await Project.create(projectData);
+    await writeAuditLog(req, 'project.created', 'success', req.admin, { projectId: project._id, publishStatus: project.publishStatus });
 
     res.status(201).json({
       success: true,
@@ -328,6 +381,16 @@ const updateProject = async (req, res, next) => {
     if (req.body.startDate) updateData.startDate = req.body.startDate;
     if (req.body.finishDate !== undefined) updateData.finishDate = req.body.finishDate || null;
     if (req.body.featured !== undefined) updateData.featured = req.body.featured === 'true' || req.body.featured === true;
+    if (req.body.category !== undefined) updateData.category = req.body.category;
+    if (req.body.scope !== undefined) updateData.scope = req.body.scope;
+    if (req.body.publishStatus !== undefined) {
+      updateData.publishStatus = req.body.publishStatus;
+      updateData.archivedAt = req.body.publishStatus === 'archived' ? new Date() : null;
+    }
+    if (req.body.highlights !== undefined) updateData.highlights = parseStringArray(req.body.highlights);
+    if (req.body.seoTitle !== undefined) updateData['seo.title'] = req.body.seoTitle;
+    if (req.body.seoDescription !== undefined) updateData['seo.description'] = req.body.seoDescription;
+    if (req.body.order !== undefined) updateData.order = Math.max(0, Number(req.body.order) || 0);
 
     if (req.body.projectName || req.body.company) {
       const baseSlug = slugify(
@@ -431,6 +494,7 @@ const updateProject = async (req, res, next) => {
       new: true,
       runValidators: true,
     });
+    await writeAuditLog(req, 'project.updated', 'success', req.admin, { projectId: project._id, fields: Object.keys(updateData) });
 
     res.json({
       success: true,
@@ -442,6 +506,15 @@ const updateProject = async (req, res, next) => {
     await cleanupFiles(req.files);
     next(error);
   }
+};
+
+const archiveProject = async (req, res, next) => {
+  try {
+    const project = await Project.findByIdAndUpdate(req.params.id, { publishStatus: 'archived', archivedAt: new Date(), featured: false }, { new: true, runValidators: true });
+    if (!project) return res.status(404).json({ success: false, error: { message: 'Project not found', statusCode: 404 } });
+    await writeAuditLog(req, 'project.archived', 'success', req.admin, { projectId: project._id });
+    return res.json({ success: true, message: 'Project archived successfully', data: project });
+  } catch (error) { return next(error); }
 };
 
 // @desc    Delete project
@@ -482,6 +555,7 @@ const deleteProject = async (req, res, next) => {
     }
 
     await project.deleteOne();
+    await writeAuditLog(req, 'project.deleted', 'success', req.admin, { projectId: project._id, projectName: project.projectName });
 
     res.json({
       success: true,
@@ -494,11 +568,15 @@ const deleteProject = async (req, res, next) => {
 
 module.exports = {
   getProjects,
+  getAdminProjects,
+  getProjectSummary,
+  getAdminProjectById,
   getProjectById,
   getProjectBySlug,
   getFeaturedProjects,
   createProject,
   updateProject,
   deleteProject,
+  archiveProject,
   getProjectUploadSignature,
 };

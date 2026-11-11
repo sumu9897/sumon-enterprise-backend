@@ -6,6 +6,8 @@ const {
   getInquiries,
   getInquiryById,
   updateInquiryStatus,
+  assignInquiry,
+  addInquiryNote,
   deleteInquiry,
   getInquiryStats,
 } = require('../controllers/inquiryController');
@@ -22,6 +24,8 @@ router.get('/stats',       protect, authorize('inquiries.view'), getInquiryStats
 router.get('/',            protect, authorize('inquiries.view'), getInquiries);
 router.get('/:id',         protect, authorize('inquiries.view'), getInquiryById);
 router.put('/:id/status',  protect, authorize('inquiries.update'), updateInquiryStatus);
+router.put('/:id/assignment', protect, authorize('inquiries.update'), assignInquiry);
+router.post('/:id/notes', protect, authorize('inquiries.update'), addInquiryNote);
 router.delete('/:id',      protect, authorize('inquiries.delete'), deleteInquiry);
 
 module.exports = router;

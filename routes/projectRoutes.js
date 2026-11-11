@@ -2,12 +2,16 @@ const express = require('express');
 const router = express.Router();
 const {
   getProjects,
+  getAdminProjects,
+  getProjectSummary,
+  getAdminProjectById,
   getProjectById,
   getProjectBySlug,
   getFeaturedProjects,
   createProject,
   updateProject,
   deleteProject,
+  archiveProject,
   getProjectUploadSignature,
 } = require('../controllers/projectController');
 const { protect, authorize, hasPermission } = require('../middleware/authMiddleware');
@@ -19,6 +23,9 @@ const { verifyImageUpload } = require('../middleware/verifyImageUpload');
 router.get('/', getProjects);
 router.get('/featured', getFeaturedProjects);
 router.get('/slug/:slug', getProjectBySlug);
+router.get('/admin/summary', protect, authorize('projects.view'), getProjectSummary);
+router.get('/admin/:id', protect, authorize('projects.view'), getAdminProjectById);
+router.get('/admin', protect, authorize('projects.view'), getAdminProjects);
 router.get('/:id', getProjectById);
 // Protected routes (Admin only)
 router.post('/images/signature', protect, authorize('projects.create', 'projects.update'), getProjectUploadSignature);
@@ -52,4 +59,5 @@ router.put(
   updateProject
 );
 router.delete('/:id', protect, authorize('projects.delete'), deleteProject);
+router.patch('/:id/archive', protect, authorize('projects.update'), archiveProject);
 module.exports = router;

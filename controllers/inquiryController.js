@@ -1,4 +1,7 @@
 const Inquiry = require('../models/Inquiry');
+const Admin = require('../models/Admin');
+const writeAuditLog = require('../utils/audit');
+const escapeRegex = (value) => value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
 // Safe email sender — NEVER crashes the request if email fails
 const safeSendEmails = async (inquiry) => {
@@ -55,16 +58,22 @@ const createInquiry = async (req, res, next) => {
 // @access Private/Admin
 const getInquiries = async (req, res, next) => {
   try {
-    const { status, page = 1, limit = 20 } = req.query;
+    const { status, assignedTo, search, page = 1, limit = 20 } = req.query;
     const query = {};
-    if (status) query.status = status;
+    if (status && ['unread', 'read', 'replied'].includes(status)) query.status = status;
+    if (assignedTo === 'unassigned') query.assignedTo = null;
+    else if (assignedTo) query.assignedTo = assignedTo;
+    if (search) {
+      const pattern = new RegExp(escapeRegex(String(search).slice(0, 100)), 'i');
+      query.$or = [{ name: pattern }, { email: pattern }, { phone: pattern }, { subject: pattern }];
+    }
 
     const pageNum = Math.max(1, Number.parseInt(page, 10) || 1);
     const limitNum = Math.min(100, Math.max(1, Number.parseInt(limit, 10) || 20));
     const skip = (pageNum - 1) * limitNum;
     const [total, inquiries] = await Promise.all([
       Inquiry.countDocuments(query),
-      Inquiry.find(query)
+      Inquiry.find(query).populate('assignedTo', 'name email role').populate('internalNotes.author', 'name email')
       .sort({ createdAt: -1 })
       .skip(skip)
       .limit(limitNum),
@@ -91,14 +100,37 @@ const getInquiries = async (req, res, next) => {
 // @access Private/Admin
 const getInquiryById = async (req, res, next) => {
   try {
-    const inquiry = await Inquiry.findById(req.params.id);
+    const inquiry = await Inquiry.findById(req.params.id).populate('assignedTo', 'name email role').populate('internalNotes.author', 'name email');
     if (!inquiry) {
       return res.status(404).json({ success: false, error: { message: 'Inquiry not found', statusCode: 404 } });
     }
+    await writeAuditLog(req, 'inquiry.status_updated', 'success', req.admin, { inquiryId: inquiry._id, status });
     return res.status(200).json({ success: true, data: inquiry });
   } catch (error) {
     next(error);
   }
+};
+
+const assignInquiry = async (req, res, next) => {
+  try {
+    const assignedTo = req.body.assignedTo || null;
+    if (assignedTo && !await Admin.exists({ _id: assignedTo, isActive: true })) return res.status(400).json({ success: false, error: { message: 'Selected administrator is not active', statusCode: 400 } });
+    const inquiry = await Inquiry.findByIdAndUpdate(req.params.id, { assignedTo }, { new: true, runValidators: true }).populate('assignedTo', 'name email role');
+    if (!inquiry) return res.status(404).json({ success: false, error: { message: 'Inquiry not found', statusCode: 404 } });
+    await writeAuditLog(req, 'inquiry.assigned', 'success', req.admin, { inquiryId: inquiry._id, assignedTo });
+    return res.json({ success: true, message: assignedTo ? 'Inquiry assigned' : 'Inquiry unassigned', data: inquiry });
+  } catch (error) { return next(error); }
+};
+
+const addInquiryNote = async (req, res, next) => {
+  try {
+    const text = String(req.body.text || '').trim();
+    if (!text || text.length > 2000) return res.status(400).json({ success: false, error: { message: 'Note must be between 1 and 2000 characters', statusCode: 400 } });
+    const inquiry = await Inquiry.findByIdAndUpdate(req.params.id, { $push: { internalNotes: { text, author: req.admin._id } } }, { new: true, runValidators: true }).populate('internalNotes.author', 'name email');
+    if (!inquiry) return res.status(404).json({ success: false, error: { message: 'Inquiry not found', statusCode: 404 } });
+    await writeAuditLog(req, 'inquiry.note_added', 'success', req.admin, { inquiryId: inquiry._id });
+    return res.status(201).json({ success: true, message: 'Internal note added', data: inquiry });
+  } catch (error) { return next(error); }
 };
 
 // @desc  Update inquiry status
@@ -116,6 +148,7 @@ const updateInquiryStatus = async (req, res, next) => {
     if (!inquiry) {
       return res.status(404).json({ success: false, error: { message: 'Inquiry not found', statusCode: 404 } });
     }
+    await writeAuditLog(req, 'inquiry.deleted', 'success', req.admin, { inquiryId: inquiry._id, email: inquiry.email });
     return res.status(200).json({ success: true, data: inquiry });
   } catch (error) {
     next(error);
@@ -159,6 +192,8 @@ module.exports = {
   getInquiries,
   getInquiryById,
   updateInquiryStatus,
+  assignInquiry,
+  addInquiryNote,
   deleteInquiry,
   getInquiryStats,
 };

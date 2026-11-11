@@ -14,6 +14,8 @@ const projectSchema = new mongoose.Schema(
       required: [true, "Please provide company name"],
       trim: true,
     },
+    category: { type: String, trim: true, maxlength: 120, default: 'General Construction' },
+    scope: { type: String, trim: true, maxlength: 2000, default: '' },
     description: {
       type: String,
       required: [true, "Please provide project description"],
@@ -123,6 +125,19 @@ const projectSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    publishStatus: {
+      type: String,
+      enum: ['draft', 'published', 'archived'],
+      default: 'published',
+      index: true,
+    },
+    archivedAt: { type: Date, default: null },
+    highlights: [{ type: String, trim: true, maxlength: 300 }],
+    seo: {
+      title: { type: String, trim: true, maxlength: 70, default: '' },
+      description: { type: String, trim: true, maxlength: 160, default: '' },
+    },
+    order: { type: Number, min: 0, default: 0 },
   },
   {
     timestamps: true,
@@ -140,6 +155,8 @@ projectSchema.index({
 });
 projectSchema.index({ status: 1, startDate: -1 });
 projectSchema.index({ featured: 1, startDate: -1 });
+projectSchema.index({ publishStatus: 1, order: 1, startDate: -1 });
+projectSchema.index({ category: 1, status: 1 });
 
 // Generate slug before saving
 projectSchema.pre("save", function (next) {

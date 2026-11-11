@@ -24,6 +24,18 @@ const googleMapUrl = {
 
 const siteContentSchema = new mongoose.Schema({
   key: { type: String, default: 'main', unique: true, immutable: true },
+  homepage: {
+    heroEyebrow: { ...text(80), default: 'Building Bangladesh Since 2000' },
+    heroTitle: { ...text(180), default: 'Construction Excellence. Built to Last.' },
+    heroSubtitle: text(400),
+    heroImageUrl: httpsUrl(1000),
+    primaryCtaLabel: { ...text(50), default: 'Explore Projects' },
+    primaryCtaUrl: { ...text(300), default: '/projects' },
+  },
+  company: {
+    mission: text(1500),
+    vision: text(1500),
+  },
   about: {
     eyebrow: { ...text(80), default: 'Our Story' },
     title: { ...text(160), default: 'About M/S Sumon Enterprise' },
@@ -59,6 +71,10 @@ const siteContentSchema = new mongoose.Schema({
     order: { type: Number, min: 0, default: 0 },
     active: { type: Boolean, default: true },
   }],
+  achievements: [{ value: text(40), label: text(120), order: { type: Number, min: 0, default: 0 }, active: { type: Boolean, default: true } }],
+  testimonials: [{ name: text(120), company: text(160), quote: text(1000), order: { type: Number, min: 0, default: 0 }, active: { type: Boolean, default: true } }],
+  draftContent: { type: mongoose.Schema.Types.Mixed, default: null },
+  publishedAt: { type: Date, default: Date.now },
   updatedBy: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin' },
 }, { timestamps: true });
 

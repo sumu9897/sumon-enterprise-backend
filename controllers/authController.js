@@ -1,5 +1,6 @@
 const crypto = require('crypto');
 const Admin = require('../models/Admin');
+const AuditLog = require('../models/AuditLog');
 const generateToken = require('../utils/generateToken');
 const writeAuditLog = require('../utils/audit');
 const { sendPasswordResetEmail, sendPasswordChangedEmail } = require('../utils/sendEmail');
@@ -41,6 +42,12 @@ const listAdmins = async (_req, res, next) => {
   try {
     const admins = await Admin.find({}).sort({ role: -1, createdAt: 1 });
     return res.json({ success: true, data: admins.map(publicAdmin) });
+  } catch (error) { return next(error); }
+};
+const listAssignableAdmins = async (_req, res, next) => {
+  try {
+    const admins = await Admin.find({ isActive: true }).select('name email role').sort({ name: 1 }).lean();
+    return res.json({ success: true, data: admins });
   } catch (error) { return next(error); }
 };
 
@@ -169,6 +176,24 @@ const getMe = async (req, res) => res.json({
   data: publicAdmin(req.admin),
   meta: { csrfToken: req.authMethod === 'cookie' ? req.authToken?.csrf : undefined },
 });
+const getAuditLogs = async (req, res, next) => {
+  try {
+    const page = Math.max(1, Number.parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(100, Math.max(1, Number.parseInt(req.query.limit, 10) || 20));
+    const query = {};
+    if (req.query.action) query.action = new RegExp(`^${String(req.query.action).replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'i');
+    if (req.query.from || req.query.to) {
+      query.createdAt = {};
+      if (req.query.from) query.createdAt.$gte = new Date(req.query.from);
+      if (req.query.to) query.createdAt.$lte = new Date(req.query.to);
+    }
+    const [logs, total] = await Promise.all([
+      AuditLog.find(query).populate('admin', 'name email role').sort({ createdAt: -1 }).skip((page - 1) * limit).limit(limit).lean(),
+      AuditLog.countDocuments(query),
+    ]);
+    return res.json({ success: true, data: logs, pagination: { page, limit, total, pages: Math.ceil(total / limit) } });
+  } catch (error) { return next(error); }
+};
 const logout = async (req, res, next) => {
   try {
     await writeAuditLog(req, 'auth.logout', 'success', req.admin);
@@ -194,4 +219,4 @@ const promotePrimaryAdmin = async (req, res, next) => {
   } catch (error) { return next(error); }
 };
 
-module.exports = { register, login, forgotPassword, resetPassword, changePassword, getMe, logout, logoutAll, promotePrimaryAdmin, listAdmins, updateAdminAccess, deleteAdmin };
+module.exports = { register, login, forgotPassword, resetPassword, changePassword, getMe, getAuditLogs, logout, logoutAll, promotePrimaryAdmin, listAdmins, listAssignableAdmins, updateAdminAccess, deleteAdmin };

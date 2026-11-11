@@ -42,6 +42,12 @@ const inquirySchema = new mongoose.Schema(
       enum: ['unread', 'read', 'replied'],
       default: 'unread',
     },
+    assignedTo: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', default: null },
+    internalNotes: [{
+      text: { type: String, required: true, trim: true, maxlength: 2000 },
+      author: { type: mongoose.Schema.Types.ObjectId, ref: 'Admin', required: true },
+      createdAt: { type: Date, default: Date.now },
+    }],
   },
   {
     timestamps: true,
@@ -49,6 +55,7 @@ const inquirySchema = new mongoose.Schema(
 );
 
 inquirySchema.index({ status: 1, createdAt: -1 });
+inquirySchema.index({ assignedTo: 1, createdAt: -1 });
 
 const Inquiry = mongoose.model('Inquiry', inquirySchema);
 

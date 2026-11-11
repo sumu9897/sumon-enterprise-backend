@@ -2,6 +2,17 @@ const SiteContent = require('../models/SiteContent');
 const Project = require('../models/Project');
 const cloudinary = require('../config/cloudinary');
 const fs = require('fs').promises;
+const writeAuditLog = require('../utils/audit');
+
+const EDITABLE_SECTIONS = ['homepage', 'company', 'about', 'services', 'contact', 'gallery', 'achievements', 'testimonials'];
+const editablePayload = (body) => Object.fromEntries(EDITABLE_SECTIONS.filter((key) => body[key] !== undefined).map((key) => [key, body[key]]));
+
+const validateGalleryProjects = async (gallery) => {
+  if (!gallery) return;
+  const ids = [...new Set(gallery.map((item) => String(item.project?._id || item.project || '')).filter(Boolean))];
+  const existing = await Project.countDocuments({ _id: { $in: ids } });
+  if (existing !== ids.length) throw Object.assign(new Error('Every gallery item must reference an existing project'), { statusCode: 400 });
+};
 
 const populateContent = (query) => query.populate('gallery.project', 'projectName slug status company address images');
 
@@ -30,22 +41,44 @@ const getAdminSiteContent = async (_req, res, next) => {
 
 const updateSiteContent = async (req, res, next) => {
   try {
-    const allowed = ['about', 'services', 'contact', 'gallery'];
-    const update = Object.fromEntries(allowed.filter((key) => req.body[key] !== undefined).map((key) => [key, req.body[key]]));
+    const update = editablePayload(req.body);
     if (!Object.keys(update).length) return res.status(400).json({ success: false, error: { message: 'No editable content was provided', statusCode: 400 } });
 
-    if (update.gallery) {
-      const ids = [...new Set(update.gallery.map((item) => String(item.project || '')).filter(Boolean))];
-      const existing = await Project.countDocuments({ _id: { $in: ids } });
-      if (existing !== ids.length) return res.status(400).json({ success: false, error: { message: 'Every gallery item must reference an existing project', statusCode: 400 } });
-    }
+    await validateGalleryProjects(update.gallery);
 
     const content = await SiteContent.findOneAndUpdate(
       { key: 'main' },
-      { $set: { ...update, updatedBy: req.admin._id } },
+      { $set: { ...update, draftContent: null, publishedAt: new Date(), updatedBy: req.admin._id } },
       { new: true, upsert: true, runValidators: true, setDefaultsOnInsert: true },
     );
-    return res.json({ success: true, message: 'Website content updated successfully', data: content });
+    await writeAuditLog(req, 'content.published', 'success', req.admin, { sections: Object.keys(update) });
+    return res.json({ success: true, message: 'Website content published successfully', data: content });
+  } catch (error) { return next(error); }
+};
+
+const saveDraft = async (req, res, next) => {
+  try {
+    const draft = editablePayload(req.body);
+    if (!Object.keys(draft).length) return res.status(400).json({ success: false, error: { message: 'No editable content was provided', statusCode: 400 } });
+    await validateGalleryProjects(draft.gallery);
+    const candidate = new SiteContent({ key: `draft-${Date.now()}`, ...draft });
+    const validation = candidate.validateSync();
+    if (validation) throw Object.assign(new Error(Object.values(validation.errors)[0]?.message || 'Draft validation failed'), { statusCode: 400 });
+    const content = await SiteContent.findOneAndUpdate({ key: 'main' }, { $set: { draftContent: draft, updatedBy: req.admin._id } }, { new: true, upsert: true, setDefaultsOnInsert: true });
+    await writeAuditLog(req, 'content.draft_saved', 'success', req.admin, { sections: Object.keys(draft) });
+    return res.json({ success: true, message: 'Draft saved successfully', data: content });
+  } catch (error) { return next(error); }
+};
+
+const publishDraft = async (req, res, next) => {
+  try {
+    const existing = await SiteContent.findOne({ key: 'main' });
+    if (!existing?.draftContent) return res.status(400).json({ success: false, error: { message: 'There is no saved draft to publish', statusCode: 400 } });
+    const draft = editablePayload(existing.draftContent);
+    await validateGalleryProjects(draft.gallery);
+    const content = await SiteContent.findOneAndUpdate({ key: 'main' }, { $set: { ...draft, draftContent: null, publishedAt: new Date(), updatedBy: req.admin._id } }, { new: true, runValidators: true });
+    await writeAuditLog(req, 'content.published', 'success', req.admin, { sections: Object.keys(draft), source: 'draft' });
+    return res.json({ success: true, message: 'Draft published successfully', data: content });
   } catch (error) { return next(error); }
 };
 
@@ -84,4 +117,4 @@ const uploadSiteImage = async (req, res, next) => {
   }
 };
 
-module.exports = { getSiteContent, getAdminSiteContent, updateSiteContent, uploadSiteImage };
+module.exports = { getSiteContent, getAdminSiteContent, updateSiteContent, saveDraft, publishDraft, uploadSiteImage };
