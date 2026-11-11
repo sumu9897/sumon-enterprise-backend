@@ -1,0 +1,14 @@
+const express = require('express');
+const { body } = require('express-validator');
+const { protect, authorize } = require('../middleware/authMiddleware');
+const validate = require('../middleware/validateMiddleware');
+const c = require('../controllers/projectTrackingController');
+const router = express.Router();
+router.get('/public/:projectId', c.getPublicTracking);
+router.get('/summary', protect, authorize('projects.view'), c.getTrackingSummary);
+router.get('/:projectId', protect, authorize('projects.view'), c.getWorkspace);
+router.post('/:projectId/milestones', protect, authorize('projects.update'), body('title').trim().isLength({ min: 3, max: 200 }), body('plannedCompletionDate').isISO8601(), validate, c.createMilestone);
+router.put('/:projectId/milestones/:id', protect, authorize('projects.update'), body('status').optional().isIn(['Not Started', 'In Progress', 'Completed', 'Delayed', 'On Hold', 'Cancelled']), body('completionPercentage').optional().isFloat({ min: 0, max: 100 }), validate, c.updateMilestone);
+router.post('/:projectId/progress', protect, authorize('projects.update'), body('reportingDate').isISO8601(), body('phase').trim().isLength({ min: 2, max: 160 }), body('plannedProgress').isFloat({ min: 0, max: 100 }), body('actualProgress').optional().isFloat({ min: 0, max: 100 }), body('approvalStatus').optional().isIn(['draft', 'submitted']), validate, c.createProgress);
+router.patch('/:projectId/progress/:id/review', protect, authorize('projects.publish'), body('approvalStatus').isIn(['approved', 'rejected']), body('publicVisible').optional().isBoolean(), validate, c.reviewProgress);
+module.exports = router;

@@ -12,6 +12,7 @@ const authRoutes = require('./routes/authRoutes');
 const projectRoutes = require('./routes/projectRoutes');
 const inquiryRoutes = require('./routes/inquiryRoutes');
 const siteContentRoutes = require('./routes/siteContentRoutes');
+const projectTrackingRoutes = require('./routes/projectTrackingRoutes');
 const errorHandler = require('./middleware/errorHandler');
 
 const app = express();
@@ -168,6 +169,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/projects', projectRoutes);
 app.use('/api/inquiries', inquiryRoutes);
 app.use('/api/site-content', siteContentRoutes);
+app.use('/api/project-tracking', projectTrackingRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

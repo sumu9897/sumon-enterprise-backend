@@ -56,7 +56,7 @@ const cleanupFiles = async (files = []) => {
 // @access  Public
 const getProjects = async (req, res, next) => {
   try {
-    const { status, company, search, page = 1, limit = 10, sort = '-startDate' } = req.query;
+    const { status, company, category, location, search, page = 1, limit = 10, sort = '-startDate' } = req.query;
 
     // Build query
     const query = { ...PUBLIC_VISIBILITY };
@@ -73,6 +73,11 @@ const getProjects = async (req, res, next) => {
 
     if (company) {
       query.company = new RegExp(escapeRegex(String(company).slice(0, 100)), 'i');
+    }
+    if (category) query.category = new RegExp(escapeRegex(String(category).slice(0, 120)), 'i');
+    if (location) {
+      const value = new RegExp(escapeRegex(String(location).slice(0, 120)), 'i');
+      query.$or = [{ 'address.area': value }, { 'address.city': value }];
     }
 
     if (search) {
