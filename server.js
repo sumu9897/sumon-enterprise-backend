@@ -1,6 +1,9 @@
 // !! dotenv MUST be the very first line — before any other require !!
 require('dotenv').config();
 
+const validateEnvironment = require('./config/environment');
+validateEnvironment();
+
 const app      = require('./app');
 const connectDB = require('./config/database');
 

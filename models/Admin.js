@@ -15,10 +15,7 @@ const adminSchema = new mongoose.Schema(
       unique: true,
       trim: true,
       lowercase: true,
-      match: [
-        /^\w+([\.-]?\w+)*@\w+([\.-]?\w+)*(\.\w{2,3})+$/,
-        'Please provide a valid email',
-      ],
+      match: [/^\S+@\S+\.\S+$/, 'Please provide a valid email'],
     },
     password: {
       type: String,
@@ -63,7 +60,8 @@ adminSchema.pre('save', async function (next) {
     return next();
   }
 
-  const salt = await bcrypt.genSalt(10);
+  const configuredRounds = Number.parseInt(process.env.BCRYPT_ROUNDS, 10) || 12;
+  const salt = await bcrypt.genSalt(Math.min(14, Math.max(10, configuredRounds)));
   this.password = await bcrypt.hash(this.password, salt);
   next();
 });

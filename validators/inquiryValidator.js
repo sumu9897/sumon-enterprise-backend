@@ -36,7 +36,8 @@ const validateInquiry = [
   body('phone')
     .trim()
     .notEmpty().withMessage('Phone number is required')
-    .isLength({ min: 7 }).withMessage('Please provide a valid phone number'),
+    .isLength({ min: 7 }).withMessage('Please provide a valid phone number')
+    .isLength({ max: 30 }).withMessage('Phone number must not exceed 30 characters'),
 
   body('subject')
     .trim()

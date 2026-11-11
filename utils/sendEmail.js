@@ -1,4 +1,5 @@
 const transporter = require('../config/email');
+const { escapeHtml, safeEmailHeader } = require('./escapeHtml');
 
 /* ─────────────────────────────────────────
    Shared design tokens
@@ -132,8 +133,10 @@ const sendEmail = async (options) => {
     const mailOptions = {
       from: process.env.EMAIL_FROM || `"M/S SUMON ENTERPRISE" <${process.env.EMAIL_USER}>`,
       to: options.to,
-      subject: options.subject,
+      subject: safeEmailHeader(options.subject),
       html: options.html,
+      disableFileAccess: true,
+      disableUrlAccess: true,
     };
     const info = await transporter.sendMail(mailOptions);
     console.log('Email sent: ' + info.messageId);
@@ -149,6 +152,13 @@ const sendEmail = async (options) => {
    Sent to: CONTACT_EMAIL (your inbox)
 ───────────────────────────────────────── */
 const sendInquiryNotification = async (inquiry) => {
+  const safe = {
+    name: escapeHtml(inquiry.name),
+    email: escapeHtml(inquiry.email),
+    phone: escapeHtml(inquiry.phone),
+    subject: escapeHtml(inquiry.subject),
+    message: escapeHtml(inquiry.message),
+  };
 
   const content = `
     <!-- Alert banner -->
@@ -171,10 +181,10 @@ const sendInquiryNotification = async (inquiry) => {
         <!-- Info table -->
         <table width="100%" cellpadding="0" cellspacing="0"
                style="border:1px solid ${BORDER};border-radius:2px;overflow:hidden;font-size:13px;">
-          ${infoRow('Name',    inquiry.name)}
-          ${infoRow('Email',   `<a href="mailto:${inquiry.email}" style="color:${GOLD};text-decoration:none;">${inquiry.email}</a>`)}
-          ${infoRow('Phone',   `<a href="tel:${inquiry.phone}"   style="color:${GOLD};text-decoration:none;">${inquiry.phone}</a>`)}
-          ${infoRow('Subject', inquiry.subject)}
+          ${infoRow('Name',    safe.name)}
+          ${infoRow('Email',   `<a href="mailto:${safe.email}" style="color:${GOLD};text-decoration:none;">${safe.email}</a>`)}
+          ${infoRow('Phone',   `<a href="tel:${safe.phone}" style="color:${GOLD};text-decoration:none;">${safe.phone}</a>`)}
+          ${infoRow('Subject', safe.subject)}
           ${infoRow('Date',    new Date().toLocaleDateString('en-US', { weekday:'long', year:'numeric', month:'long', day:'numeric' }))}
         </table>
       </td>
@@ -188,7 +198,7 @@ const sendInquiryNotification = async (inquiry) => {
         </p>
         <div style="width:30px;height:2px;background:${GOLD};border-radius:1px;margin-bottom:16px;"></div>
         <div style="background:${LIGHT};border:1px solid ${BORDER};border-radius:2px;padding:20px 24px;">
-          <p style="margin:0;font-size:14px;color:${DARK};line-height:1.8;white-space:pre-wrap;">${inquiry.message}</p>
+          <p style="margin:0;font-size:14px;color:${DARK};line-height:1.8;white-space:pre-wrap;">${safe.message}</p>
         </div>
       </td>
     </tr>
@@ -199,14 +209,14 @@ const sendInquiryNotification = async (inquiry) => {
         <table cellpadding="0" cellspacing="0">
           <tr>
             <td style="background:${GOLD};border-radius:2px;">
-              <a href="mailto:${inquiry.email}?subject=Re: ${encodeURIComponent(inquiry.subject)}"
+              <a href="mailto:${safe.email}?subject=Re:%20${encodeURIComponent(safeEmailHeader(inquiry.subject))}"
                  style="display:inline-block;padding:12px 28px;font-size:12px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:${WHITE};text-decoration:none;">
                 ✉ &nbsp; Reply to Client
               </a>
             </td>
             <td width="12"></td>
             <td style="background:transparent;border:1px solid ${BORDER};border-radius:2px;">
-              <a href="tel:${inquiry.phone}"
+              <a href="tel:${safe.phone}"
                  style="display:inline-block;padding:12px 28px;font-size:12px;font-weight:700;letter-spacing:.15em;text-transform:uppercase;color:${DARK};text-decoration:none;">
                 📞 &nbsp; Call Client
               </a>
@@ -219,7 +229,7 @@ const sendInquiryNotification = async (inquiry) => {
 
   await sendEmail({
     to: process.env.CONTACT_EMAIL,
-    subject: `📩 New Inquiry: ${inquiry.subject} — from ${inquiry.name}`,
+    subject: `New Inquiry: ${safeEmailHeader(inquiry.subject)} — from ${safeEmailHeader(inquiry.name)}`,
     html: baseWrapper(content),
   });
 };
@@ -229,6 +239,12 @@ const sendInquiryNotification = async (inquiry) => {
    Sent to: client's email
 ───────────────────────────────────────── */
 const sendInquiryConfirmation = async (inquiry) => {
+  const safe = {
+    name: escapeHtml(inquiry.name),
+    phone: escapeHtml(inquiry.phone),
+    subject: escapeHtml(inquiry.subject),
+    message: escapeHtml(inquiry.message),
+  };
 
   const content = `
     <!-- Greeting section -->
@@ -240,7 +256,7 @@ const sendInquiryConfirmation = async (inquiry) => {
         <div style="width:30px;height:2px;background:${GOLD};border-radius:1px;margin-bottom:20px;"></div>
 
         <h2 style="margin:0 0 12px;font-size:24px;font-weight:700;color:${DARK};line-height:1.3;">
-          Thank You, ${inquiry.name}!
+          Thank You, ${safe.name}!
         </h2>
         <p style="margin:0;font-size:14px;color:${GRAY};line-height:1.8;">
           We have received your message and appreciate you reaching out to
@@ -288,15 +304,15 @@ const sendInquiryConfirmation = async (inquiry) => {
 
         <table width="100%" cellpadding="0" cellspacing="0"
                style="border:1px solid ${BORDER};border-radius:2px;overflow:hidden;">
-          ${infoRow('Subject', inquiry.subject)}
-          ${infoRow('Phone',   inquiry.phone)}
+          ${infoRow('Subject', safe.subject)}
+          ${infoRow('Phone',   safe.phone)}
         </table>
 
         <div style="background:${DARK};border-radius:2px;padding:20px 24px;margin-top:12px;">
           <p style="margin:0 0 8px;font-size:10px;font-weight:700;letter-spacing:.2em;text-transform:uppercase;color:rgba(255,255,255,.4);">
             Your Message
           </p>
-          <p style="margin:0;font-size:13px;color:rgba(255,255,255,.75);line-height:1.8;white-space:pre-wrap;">${inquiry.message}</p>
+          <p style="margin:0;font-size:13px;color:rgba(255,255,255,.75);line-height:1.8;white-space:pre-wrap;">${safe.message}</p>
         </div>
       </td>
     </tr>
@@ -379,13 +395,6 @@ const sendInquiryConfirmation = async (inquiry) => {
     html: baseWrapper(content),
   });
 };
-
-const escapeHtml = (value) => String(value || '')
-  .replaceAll('&', '&amp;')
-  .replaceAll('<', '&lt;')
-  .replaceAll('>', '&gt;')
-  .replaceAll('"', '&quot;')
-  .replaceAll("'", '&#039;');
 
 const sendPasswordResetEmail = async (admin, resetUrl) => {
   const safeName = escapeHtml(admin.name);

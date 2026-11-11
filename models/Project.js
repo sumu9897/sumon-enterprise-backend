@@ -78,6 +78,10 @@ const projectSchema = new mongoose.Schema(
         url: {
           type: String,
           required: true,
+          validate: {
+            validator: (value) => /^https:\/\//i.test(value) || /^\/uploads\//.test(value),
+            message: 'Project image URL must use HTTPS or local upload storage',
+          },
         },
         publicId: {
           type: String,

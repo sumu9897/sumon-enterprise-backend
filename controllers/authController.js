@@ -4,6 +4,7 @@ const generateToken = require('../utils/generateToken');
 const writeAuditLog = require('../utils/audit');
 const { sendPasswordResetEmail, sendPasswordChangedEmail } = require('../utils/sendEmail');
 const { normalizePermissions } = require('../constants/adminPermissions');
+const { setSessionCookie, clearSessionCookie, createCsrfToken } = require('../utils/session');
 
 const PRIMARY_ADMIN_EMAIL = (process.env.PRIMARY_ADMIN_EMAIL || 'sumonconstruction2024@gmail.com').toLowerCase();
 const RESET_TTL_MS = 15 * 60 * 1000;
@@ -86,7 +87,11 @@ const login = async (req, res, next) => {
     admin.lastLogin = new Date();
     await admin.save();
     await writeAuditLog(req, 'auth.login', 'success', admin);
-    return res.json({ success: true, message: 'Login successful', data: { admin: publicAdmin(admin), token: generateToken(admin, req.body.remember === true) } });
+    const remember = req.body.remember === true;
+    const csrfToken = createCsrfToken();
+    const token = generateToken(admin, remember, csrfToken);
+    setSessionCookie(res, token, remember);
+    return res.json({ success: true, message: 'Login successful', data: { admin: publicAdmin(admin), token, csrfToken } });
   } catch (error) { return next(error); }
 };
 
@@ -134,6 +139,7 @@ const resetPassword = async (req, res, next) => {
     admin.passwordResetExpiresAt = undefined;
     admin.tokenVersion = (admin.tokenVersion || 0) + 1;
     await admin.save();
+    clearSessionCookie(res);
     await writeAuditLog(req, 'auth.password_reset', 'success', admin);
     await sendPasswordChangedEmail(admin);
     return res.json({ success: true, message: 'Password updated. Please sign in with your new password.' });
@@ -151,18 +157,30 @@ const changePassword = async (req, res, next) => {
     admin.passwordChangedAt = new Date();
     admin.tokenVersion = (admin.tokenVersion || 0) + 1;
     await admin.save();
+    clearSessionCookie(res);
     await writeAuditLog(req, 'auth.password_change', 'success', admin);
     await sendPasswordChangedEmail(admin);
     return res.json({ success: true, message: 'Password changed. Please sign in again.' });
   } catch (error) { return next(error); }
 };
 
-const getMe = async (req, res) => res.json({ success: true, data: publicAdmin(req.admin) });
-const logout = async (req, res) => { await writeAuditLog(req, 'auth.logout', 'success', req.admin); return res.json({ success: true, message: 'Logged out successfully' }); };
+const getMe = async (req, res) => res.json({
+  success: true,
+  data: publicAdmin(req.admin),
+  meta: { csrfToken: req.authMethod === 'cookie' ? req.authToken?.csrf : undefined },
+});
+const logout = async (req, res, next) => {
+  try {
+    await writeAuditLog(req, 'auth.logout', 'success', req.admin);
+    clearSessionCookie(res);
+    return res.json({ success: true, message: 'Logged out successfully' });
+  } catch (error) { return next(error); }
+};
 const logoutAll = async (req, res, next) => {
   try {
     await Admin.updateOne({ _id: req.admin._id }, { $inc: { tokenVersion: 1 } });
     await writeAuditLog(req, 'auth.logout_all', 'success', req.admin);
+    clearSessionCookie(res);
     return res.json({ success: true, message: 'All sessions have been signed out.' });
   } catch (error) { return next(error); }
 };

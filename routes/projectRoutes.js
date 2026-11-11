@@ -14,6 +14,7 @@ const { protect, authorize, hasPermission } = require('../middleware/authMiddlew
 const upload = require('../utils/fileUpload');
 const projectValidators = require('../validators/projectValidator');
 const validate = require('../middleware/validateMiddleware');
+const { verifyImageUpload } = require('../middleware/verifyImageUpload');
 // Public routes
 router.get('/', getProjects);
 router.get('/featured', getFeaturedProjects);
@@ -26,6 +27,7 @@ router.post(
   protect,
   authorize('projects.create'),
   upload.array('images', 10),
+  verifyImageUpload,
   projectValidators.createProject,
   validate,
   createProject
@@ -34,6 +36,7 @@ router.put(
   '/:id',
   protect,
   upload.array('images', 10),
+  verifyImageUpload,
   (req, res, next) => {
     const fields = Object.keys(req.body || {});
     const statusOnly = fields.length > 0 && fields.every((field) => field === 'status');
